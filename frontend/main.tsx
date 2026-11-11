@@ -16,8 +16,8 @@ import {
   defaults,
   filterPlayers,
   compare,
-  csv,
 } from "./data";
+import { ExportDialog } from "./ExportDialog";
 import logo from "./assets/fox-logo.png";
 import "./style.css";
 import roleNames from "./roles.json";
@@ -913,6 +913,7 @@ function App() {
     [filters, setFilters] = useState<Filters>(defaults),
     [sort, setSort] = useState<{ key: string; asc: boolean } | null>(null),
     [cmp, setCmp] = useState(false),
+    [exportOpen, setExportOpen] = useState(false),
     [selected, setSelected] = useState<number[]>([]),
     [columns, setColumns] = useSaved<string[]>("foxy-columns", overview),
     [currency, setCurrency] = useSaved("foxy-currency", "EUR"),
@@ -1079,17 +1080,6 @@ function App() {
     try {
       const p = await invoke<string | null>("choose_save");
       if (p) setPath(p);
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-  async function exportRows() {
-    try {
-      const p = await invoke<string | null>("export_csv", {
-        contents: csv(rows, factor, symbol),
-        suggestedName: mode === "Staff" ? "foxy-staff.csv" : "foxy-players.csv",
-      });
-      if (p) setNotice("Exported " + p);
     } catch (e) {
       setError(String(e));
     }
@@ -1664,7 +1654,7 @@ function App() {
               ) : (
                 <Tabs label="Staff table" options={["Overview", ...Object.keys(staffGroups)]} value={staffGroup} onChange={setStaffGroup} />
               )}
-              <button onClick={exportRows} disabled={!rows.length}>
+              <button onClick={() => setExportOpen(true)} disabled={!rows.length}>
                 Export CSV
               </button>
             </div>
@@ -1730,6 +1720,13 @@ function App() {
           </>
         )}
       </main>
+      {exportOpen && (
+        <ExportDialog
+          rows={rows} columns={shown} mode={mode}
+          factor={factor} symbol={symbol} currency={currency}
+          onClose={() => setExportOpen(false)} onExport={setNotice}
+        />
+      )}
     </div>
   );
 }

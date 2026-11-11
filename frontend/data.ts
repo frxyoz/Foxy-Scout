@@ -369,16 +369,30 @@ export function currencyRow(r: Row, factor: number, symbol: string): Row {
       ]),
   );
 }
-export function csv(rows: Row[], factor: number, symbol: string): string {
+export type CsvOptions = {
+  columns?: string[];
+  delimiter?: "," | ";" | "\t";
+  includeHeaders?: boolean;
+};
+export function csv(
+  rows: Row[], factor: number, symbol: string, options: CsvOptions = {},
+): string {
   if (!rows.length) return "";
   const converted = rows.map((r) => currencyRow(r, factor, symbol));
-  const keys = Object.keys(converted[0]);
+  const available = new Set<string>();
+  for (const row of converted) {
+    for (const key of Object.keys(row)) available.add(key);
+  }
+  const keys = options.columns
+    ? [...new Set(options.columns)]
+    : [...available];
+  const delimiter = options.delimiter ?? ",";
   const escape = (v: any) => '"' + String(v ?? "").replaceAll('"', '""') + '"';
   return (
     "\uFEFF" +
     [
-      keys.map(escape).join(","),
-      ...converted.map((r) => keys.map((k) => escape(r[k])).join(",")),
+      ...(options.includeHeaders === false ? [] : [keys.map(escape).join(delimiter)]),
+      ...converted.map((r) => keys.map((k) => escape(r[k])).join(delimiter)),
     ].join("\r\n")
   );
 }

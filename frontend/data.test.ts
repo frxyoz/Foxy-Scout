@@ -95,6 +95,21 @@ describe("filter parity", () => {
   });
 });
 describe("display currency and CSV", () => {
+  it("exports requested columns in order with optional headers and separators", () => {
+    const input = [{ Name: 'A; "B"\nC', MarketValue: 1112700, Age: 20 }];
+    expect(csv(input, 1 / 1.1127, "€", {
+      columns: ["MarketValue", "Name"], delimiter: ";", includeHeaders: false,
+    })).toBe('\uFEFF"1000000";"A; ""B""\nC"');
+    expect(csv(input, 1, "$", { columns: ["Age", "Name"], delimiter: "\t" }))
+      .toBe('\uFEFF"Age"\t"Name"\r\n"20"\t"A; ""B""\nC"');
+  });
+  it("includes scalar columns discovered after the first row and omits nested payloads", () => {
+    expect(csv([{ Name: "First" }, { Name: "Second", Age: 21, RoleReport: {} }], 1, "$"))
+      .toBe('\uFEFF"Name","Age"\r\n"First",""\r\n"Second","21"');
+    expect(csv([], 1, "$", { includeHeaders: false })).toBe("");
+    expect(csv([{ Name: "First" }], 1, "$", { columns: ["Name", "Age"] }))
+      .toBe('\uFEFF"Name","Age"\r\n"First",""');
+  });
   it("converts amounts and clause descriptions without mutating canonical USD", () => {
     const euro = currencyRow(rows[0], 1 / 1.1127, "€");
     expect(euro.MarketValue).toBe(1000000);

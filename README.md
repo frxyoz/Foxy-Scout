@@ -18,6 +18,7 @@ Foxy Scout reads an FM24 save on your computer and turns it into a searchable pl
 - Compare up to six players across player attributes and contract information.
 - Search staff and review coaching, scouting, medical and mental attributes.
 - Display and export values in euros or US dollars. Edit the USD-per-euro rate in Settings.
+- Customize CSV exports: all filtered rows or a row range, current table or all columns, comma/semicolon/tab separators, and optional headers. Review row and column counts before saving.
 - Keep save files local. The reader does not modify saves.
 
 ## Currency

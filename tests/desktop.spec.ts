@@ -48,6 +48,7 @@ test('player workflows preserve filters, reports, currency, export and compariso
  await page.getByLabel('Currency',{exact:true}).selectOption('USD');
  await page.getByLabel('Night theme',{exact:true}).check();
  await page.getByRole('button',{name:'Export CSV',exact:true}).click();
+ await page.getByRole('button',{name:'Save CSV',exact:true}).click();
  const exports=await page.evaluate(()=>(window as any).__exports);
  expect(exports).toHaveLength(1);expect(exports[0].contents).toContain('100000');
  expect(exports[0].contents).toContain('Alex [Young]');
@@ -115,4 +116,70 @@ test('load failures show an actionable error and release the load button',async(
  await page.getByRole('button',{name:'Load FM24 save',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('Finish saving in FM24');
  await expect(page.getByRole('button',{name:'Load FM24 save',exact:true})).toBeEnabled();
+});
+
+test('CSV export supports sorted row ranges, table columns and validation',async({page})=>{
+ await setup(page);
+ await page.getByRole('button',{name:'Player',exact:true}).click();
+ const names=await page.locator('.results tbody tr[aria-label]').evaluateAll(rows=>rows.map(row=>row.getAttribute('aria-label')!.replace('Open ','')));
+ await page.getByRole('button',{name:'Export CSV',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog).toContainText('6 data rows');
+ await dialog.getByLabel('Rows to export').selectOption('range');
+ await dialog.getByLabel('Start at row').fill('2');
+ await dialog.getByLabel('Number of rows').fill('0');
+ await expect(dialog.getByRole('button',{name:'Save CSV',exact:true})).toBeDisabled();
+ await dialog.getByLabel('Number of rows').fill('6');
+ await expect(dialog.getByRole('button',{name:'Save CSV',exact:true})).toBeDisabled();
+ await dialog.getByLabel('Number of rows').fill('2');
+ await dialog.getByLabel('Columns to export').selectOption('visible');
+ await dialog.getByLabel('Separator').selectOption(';');
+ await dialog.getByLabel('Include column headers').uncheck();
+ await expect(dialog).toContainText('2 data rows');
+ await expect(dialog).toContainText('rows 2–3');
+ await page.screenshot({path:'test-results/csv-export-dialog.png'});
+ await dialog.getByRole('button',{name:'Save CSV',exact:true}).click();
+ await expect(dialog).not.toBeVisible();
+ const exports=await page.evaluate(()=>(window as any).__exports);
+ expect(exports).toHaveLength(1);
+ const lines=exports[0].contents.replace(/^\uFEFF/,'').split('\r\n');
+ expect(lines).toHaveLength(2);
+ expect(lines[0].startsWith('"'+names[1]+'";')).toBe(true);
+ expect(lines[1].startsWith('"'+names[2]+'";')).toBe(true);
+ expect(exports[0].contents).not.toContain('RoleReport');
+ await page.getByRole('button',{name:'Export CSV',exact:true}).click();
+ await page.keyboard.press('Escape');
+ await expect(dialog).not.toBeVisible();
+ expect(await page.evaluate(()=>(window as any).__exports.length)).toBe(1);
+});
+
+test('staff CSV export handles save cancellation, errors and retry',async({page})=>{
+ await setup(page);
+ await page.getByRole('button',{name:'Staff',exact:true}).click();
+ await page.getByRole('button',{name:'Export CSV',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog).toContainText('Export staff to CSV');
+ await page.evaluate(()=>{
+  const original=(window as any).__TAURI_INTERNALS__.invoke;
+  let attempts=0;
+  (window as any).__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   if(command==='export_csv'){
+    attempts++;
+    if(attempts===1)return null;
+    if(attempts===2)throw new Error('Disk is full');
+   }
+   return original(command,args);
+  };
+ });
+ await dialog.getByRole('button',{name:'Save CSV',exact:true}).click();
+ await expect(dialog).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'Save CSV',exact:true})).toBeEnabled();
+ await dialog.getByRole('button',{name:'Save CSV',exact:true}).click();
+ await expect(dialog.getByRole('alert')).toContainText('Disk is full');
+ await dialog.getByRole('button',{name:'Save CSV',exact:true}).click();
+ await expect(dialog).not.toBeVisible();
+ const exports=await page.evaluate(()=>(window as any).__exports);
+ expect(exports).toHaveLength(1);
+ expect(exports[0].suggestedName).toBe('foxy-staff.csv');
+ expect(exports[0].contents).toContain('Example Coach');
 });
