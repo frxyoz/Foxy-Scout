@@ -1,4 +1,3 @@
-<p align="center"><img src="assets/fox-logo.png" alt="Foxy Scout" width="112"></p>
 <h1 align="center">Foxy Scout</h1>
 <p align="center">A fast, local scouting companion for Football Manager 2024.</p>
 <p align="center"><img src="assets/icon.png" alt="Foxy Scout icon" width="256"></p>
