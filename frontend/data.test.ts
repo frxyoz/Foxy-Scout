@@ -40,6 +40,16 @@ const rows: Row[] = [
   },
 ];
 describe("filter parity", () => {
+  it("calculates market minus sale for the selected scenario, sorting and CSV currency", () => {
+    const result = filterPlayers(rows, { ...defaults, sort: "ValueDifference" }, "2031-08-17", 1);
+    expect(result[0].ValueDifference).toBe(-887300);
+    expect(result[1].ValueDifference).toBeNull();
+    const foreign = filterPlayers(rows, { ...defaults, scenario: "Foreign clubs" }, "2031-08-17", 1);
+    expect(foreign[0].ValueDifference).toBe(612700);
+    expect(currencyRow(foreign[0], 2, "$" ).ValueDifference).toBe(1225400);
+    expect(csv(foreign, 2, "$", { columns: ["ValueDifference"] })).toBe('\uFEFF"ValueDifference"\r\n"1225400"\r\n""');
+    expect(rows[0].ValueDifference).toBeUndefined();
+  });
   it("uses literal search and UID substring matching", () => {
     expect(
       filterPlayers(

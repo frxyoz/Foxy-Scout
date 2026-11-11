@@ -183,3 +183,70 @@ test('staff CSV export handles save cancellation, errors and retry',async({page}
  expect(exports[0].suggestedName).toBe('foxy-staff.csv');
  expect(exports[0].contents).toContain('Example Coach');
 });
+
+test('numeric filters allow clearing and replacing digits before restoring defaults',async({page})=>{
+ await setup(page);
+ const age=page.getByRole('spinbutton',{name:'Player age minimum',exact:true});
+ await age.focus();
+ await page.keyboard.press('End');
+ await page.keyboard.press('Backspace');
+ await expect(age).toHaveValue('1');
+ await page.keyboard.press('Backspace');
+ await expect(age).toHaveValue('');
+ await age.fill('21');
+ await age.blur();
+ await expect(age).toHaveValue('21');
+ await age.fill('');
+ await age.blur();
+ await expect(age).toHaveValue('15');
+ for(const section of ['Ability','Market']) await page.locator('summary').getByText(section,{exact:true}).click();
+ const playerInputs=page.locator('aside form input[type="number"]');
+ const defaults=['15','40','1','200','1','200','0','100','0','100','0','0'];
+ await expect(playerInputs).toHaveCount(defaults.length);
+ for(let i=0;i<defaults.length;i++){
+  const input=playerInputs.nth(i);
+  await input.fill('');
+  await expect(input).toHaveValue('');
+  await input.blur();
+  await expect(input).toHaveValue(defaults[i]);
+ }
+ await age.fill('2');
+ await age.press('Enter');
+ await expect(age).toHaveValue('15');
+ await page.getByRole('button',{name:'Staff',exact:true}).click();
+ const staffInputs=page.locator('aside form input[type="number"]');
+ for(const [i,value] of ['18','80','1'].entries()){
+  const input=staffInputs.nth(i);
+  await input.fill('');
+  await expect(input).toHaveValue('');
+  await input.blur();
+  await expect(input).toHaveValue(value);
+ }
+});
+
+test('market minus sale column displays, sorts and exports the selected scenario',async({page})=>{
+ const data=structuredClone(fixture);
+ data.players[0].MarketValue=500000;
+ data.players[0].SaleValue=100000;
+ data.players[0].SaleValueForeign=200000;
+ await setup(page,data);
+ await page.getByText('Settings',{exact:true}).click();
+ await page.getByLabel('Currency',{exact:true}).selectOption('USD');
+ const heading=page.getByRole('button',{name:'Market − Sale',exact:true});
+ await expect(heading).toBeVisible();
+ const row=page.getByRole('row',{name:'Open Alex [Young]',exact:true});
+ await expect(row.locator('.money-cell[aria-label="$400,000"]')).toBeVisible();
+ await page.locator('summary').getByText('Market',{exact:true}).click();
+ await page.getByLabel('Buying-club eligibility').selectOption('Foreign clubs');
+ await page.getByLabel('Sort results by').selectOption('ValueDifference');
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ await expect(row.locator('.money-cell[aria-label="$300,000"]')).toBeVisible();
+ await heading.click();
+ await expect(page.getByRole('button',{name:'Market − Sale ↓',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Export CSV',exact:true}).click();
+ await page.getByRole('dialog').getByLabel('Columns to export').selectOption('visible');
+ await page.getByRole('button',{name:'Save CSV',exact:true}).click();
+ const exports=await page.evaluate(()=>(window as any).__exports);
+ expect(exports[0].contents).toContain('"ValueDifference"');
+ expect(exports[0].contents).toContain('"300000"');
+});

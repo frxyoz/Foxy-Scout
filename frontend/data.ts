@@ -161,6 +161,7 @@ export const labels: Record<string, string> = {
   PotRole: "Potential role",
   MarketValue: "Market Value",
   SaleValue: "Sale Value",
+  ValueDifference: "Market − Sale",
   ReleaseClause: "Release cap",
   SaleValueBasis: "Sale basis",
   Wage: "Annual wage",
@@ -199,6 +200,7 @@ export const overview = [
   "BestPos",
   "MarketValue",
   "SaleValue",
+  "ValueDifference",
 ];
 export const extras = [
   "Club",
@@ -215,6 +217,7 @@ export const extras = [
   "PotRtg",
   "MarketValue",
   "SaleValue",
+  "ValueDifference",
   "ReleaseClause",
   "SaleValueBasis",
   "Contract",
@@ -226,6 +229,7 @@ export const extras = [
   "Foot",
 ];
 export const isMoney = (k: string) =>
+  k === "ValueDifference" ||
   k === "Wage" ||
   (/^(MarketValue|SaleValue|ReleaseClause)/.test(k) &&
     !k.includes("Basis") &&
@@ -266,7 +270,7 @@ export const defaults: Filters = {
 };
 export function scenarioRows(rows: Row[], scenario: string): Row[] {
   const s = suffixes[scenarios.indexOf(scenario)] || "";
-  return s
+  const adjusted: Row[] = s
     ? rows.map((r) => ({
         ...r,
         SaleValue: r["SaleValue" + s],
@@ -275,6 +279,11 @@ export function scenarioRows(rows: Row[], scenario: string): Row[] {
         ClauseScenario: scenario,
       }))
     : rows;
+  return adjusted.map((r) => ({
+    ...r,
+    ValueDifference: r.MarketValue == null || r.SaleValue == null
+      ? null : r.MarketValue - r.SaleValue,
+  }));
 }
 export function contractDate(v: any): number | null {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(v));

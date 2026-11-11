@@ -59,9 +59,42 @@ function Field({
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      {React.Children.map(children, child => React.isValidElement<Record<string,unknown>>(child) && (child.type === 'input' || child.type === 'select') ? React.cloneElement(child, {id}) : child)}
+      {React.Children.map(children, child => React.isValidElement<Record<string,unknown>>(child) && (child.type === 'input' || child.type === 'select' || child.type === NumericInput) ? React.cloneElement(child, {id}) : child)}
     </div>
   );
+}
+function NumericInput({ value, onChange, min, max, fallback, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "min" | "max"> & {
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max?: number;
+  fallback: number;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setDraft(String(value));
+  }, [value]);
+  const normalize = (raw: string) => {
+    const number = raw.trim() === "" ? fallback : Number(raw);
+    return Math.max(min, Math.min(max ?? Infinity, Number.isFinite(number) ? number : fallback));
+  };
+  return <input {...props} type="number" min={min} max={max} value={draft}
+    onFocus={() => { focused.current = true; }}
+    onChange={(e) => {
+      setDraft(e.target.value);
+      onChange(normalize(e.target.value));
+    }}
+    onBlur={(e) => {
+      focused.current = false;
+      const next = normalize(e.target.value);
+      setDraft(String(next));
+      onChange(next);
+    }}
+    onKeyDown={(e) => {
+      if (e.key === "Enter") e.currentTarget.blur();
+    }}
+  />;
 }
 function Range({
   label,
@@ -69,43 +102,37 @@ function Range({
   onChange,
   min,
   max,
+  fallback = [min, max],
 }: {
   label: string;
   value: [number, number];
   onChange: (v: [number, number]) => void;
   min: number;
   max: number;
+  fallback?: [number, number];
 }) {
   return (
     <fieldset className="range">
       <legend>{label}</legend>
       <div>
-        <input
+        <NumericInput
           aria-label={label + " minimum"}
           type="number"
           min={min}
           max={value[1]}
           value={value[0]}
-          onChange={(e) =>
-            onChange([
-              Math.max(min, Math.min(value[1], +e.target.value)),
-              value[1],
-            ])
-          }
+          fallback={fallback[0]}
+          onChange={(v) => onChange([v, value[1]])}
         />
         <span>to</span>
-        <input
+        <NumericInput
           aria-label={label + " maximum"}
           type="number"
           min={value[0]}
           max={max}
           value={value[1]}
-          onChange={(e) =>
-            onChange([
-              value[0],
-              Math.min(max, Math.max(value[0], +e.target.value)),
-            ])
-          }
+          fallback={fallback[1]}
+          onChange={(v) => onChange([value[0], v])}
         />
       </div>
     </fieldset>
@@ -915,7 +942,10 @@ function App() {
     [cmp, setCmp] = useState(false),
     [exportOpen, setExportOpen] = useState(false),
     [selected, setSelected] = useState<number[]>([]),
-    [columns, setColumns] = useSaved<string[]>("foxy-columns", overview),
+    [columns, setColumns] = useSaved<string[]>("foxy-columns-v2", (() => {
+      const previous = saved<string[]>("foxy-columns", overview);
+      return previous.includes("ValueDifference") ? previous : [...previous, "ValueDifference"];
+    })()),
     [currency, setCurrency] = useSaved("foxy-currency", "EUR"),
     [rate, setRate] = useSaved("foxy-rate", 1.1127),
     [night, setNight] = useSaved("foxy-night", false),
@@ -1275,14 +1305,12 @@ function App() {
                       key={k}
                       label={`${k === "min" ? "Min" : "Max"} (${symbol}M)`}
                     >
-                      <input
-                        type="number"
-                        min="0"
+                      <NumericInput
+                        min={0}
+                        fallback={defaults[k]}
                         value={draft[k]}
                         title="0 = unbounded"
-                        onChange={(e) =>
-                          setFilter(k, Math.max(0, +e.target.value))
-                        }
+                        onChange={(v) => setFilter(k, v)}
                       />
                     </Field>
                   ))}
@@ -1327,6 +1355,7 @@ function App() {
                   "PotRtg",
                   "MarketValue",
                   "SaleValue",
+                  "ValueDifference",
                   "Age",
                   "Name",
                   ...groups.Hidden,
@@ -1375,6 +1404,7 @@ function App() {
               label="Staff age"
               min={18}
               max={100}
+              fallback={[18, 80]}
               value={sf.age}
               onChange={(v) => setSf({ ...sf, age: v })}
             />
@@ -1397,12 +1427,12 @@ function App() {
               </select>
             </Field>
             <Field label="Minimum attribute / 20">
-              <input
-                type="number"
-                min="1"
-                max="20"
+              <NumericInput
+                min={1}
+                max={20}
+                fallback={1}
                 value={sf.min}
-                onChange={(e) => setSf({ ...sf, min: +e.target.value })}
+                onChange={(v) => setSf({ ...sf, min: v })}
               />
             </Field>
             <Field label="Sort staff by">
