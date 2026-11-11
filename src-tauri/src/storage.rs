@@ -10,7 +10,7 @@ use std::{
     time::{Instant, UNIX_EPOCH},
 };
 
-const SCHEMA: &str = "foxy-rust-fm24-v2";
+const SCHEMA: &str = "foxy-rust-fm24-v3";
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Snapshot {
     pub players: Vec<Value>,
@@ -235,6 +235,26 @@ mod tests {
                 .cache_hit
         );
     }
+    #[test]
+    fn older_nationality_cache_is_rebuilt() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("save.fm");
+        let cache = dir.path().join("cache");
+        fs::write(&path, b"save").unwrap();
+        let key = fingerprint(&path).unwrap();
+        let mut old_snapshot = load_save_at(&path, false, &cache, fixture).unwrap();
+        old_snapshot.players = vec![serde_json::json!({"Nation": "(203)"})];
+        let old = Envelope {
+            schema: "foxy-rust-fm24-v2".into(), key: key.clone(), snapshot: old_snapshot,
+        };
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+        encoder.write_all(&serde_json::to_vec(&old).unwrap()).unwrap();
+        atomic_write(&cache.join(format!("{key}.json.gz")), &encoder.finish().unwrap()).unwrap();
+        let rebuilt = load_save_at(&path, false, &cache, fixture).unwrap();
+        assert!(!rebuilt.cache_hit);
+        assert!(rebuilt.players.is_empty());
+    }
+
     #[test]
     fn changed_or_wrong_version_saves_never_enter_cache() {
         let dir = tempfile::tempdir().unwrap();

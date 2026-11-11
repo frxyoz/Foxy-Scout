@@ -513,7 +513,8 @@ pub fn nation(id: i32) -> String {
         236 => "STP".into(),
         247 => "MNE".into(),
         248 => "SSU".into(),
-        _ => format!("({})", id),
+        // Unknown database IDs are not nationality labels.
+        _ => String::new(),
     }
 }
 #[derive(Clone, Debug)]
@@ -787,7 +788,7 @@ pub fn resolve_player_names(
                 let nid = u16_at(d, bp + 7).unwrap_or(u16::MAX);
                 if !(1940..=(year - 14).min(2160)).contains(&(by as i32))
                     || !(1..=366).contains(&day)
-                    || nation(nid as i32).starts_with('(')
+                    || nation(nid as i32).is_empty()
                 {
                     continue;
                 }
@@ -995,5 +996,35 @@ mod compressed_input_tests {
         raw.extend(zstd::stream::encode_all(&payload[..], 1).unwrap());
         std::fs::write(&path, raw).unwrap();
         assert!(decompress_save(&path).unwrap_err().contains("2024"));
+    }
+}
+
+#[cfg(test)]
+mod nationality_tests {
+    use super::*;
+
+    #[test]
+    fn nationality_labels_never_expose_numeric_database_ids() {
+        for id in [203, 204, 205, 9999, -1] {
+            assert_eq!(nation(id), "", "unresolved nation {id} must stay blank");
+        }
+        assert_eq!(nation(139), "ENG");
+        assert_eq!(nation(143), "FRA");
+    }
+
+    #[test]
+    fn unresolved_nationalities_stay_blank_through_name_resolution_and_enrichment() {
+        for id in [203, 204, 205] {
+            let mut row = json!({"attributes": {}, "positions": {}});
+            apply_name(&mut row, &NameEntry {
+                offset: 0, name: "Example Person".into(), year: 2000,
+                day: 1, nation: id, pers: vec![],
+            }, 2026);
+            // Staff use the resolved name record directly.
+            assert_eq!(row["nation"], "");
+            let mut players = vec![row];
+            crate::enrich::enrich_players(&mut players, "2026-11-11");
+            assert_eq!(players[0]["Nation"], "");
+        }
     }
 }
