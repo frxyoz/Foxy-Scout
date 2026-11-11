@@ -1,0 +1,43 @@
+[package]
+name = "foxy-scout"
+version = "2.0.0"
+edition = "2021"
+default-run = "foxy-scout"
+
+[lib]
+name = "foxy_scout"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "foxy-scout"
+path = "src/main.rs"
+
+[[bin]]
+name = "scout-data"
+path = "src/bin/scout-data.rs"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:tauri", "dep:rfd", "dep:tauri-build"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [], optional = true }
+
+[dependencies]
+tauri = { version = "2", features = [], optional = true }
+rfd = { version = "0.15", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+memchr = "2"
+zstd = "0.13"
+flate2 = "1"
+sha2 = "0.10"
+dirs = "6"
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

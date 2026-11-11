@@ -1,0 +1,24 @@
+.venv/
+.cache/
+__pycache__/
+*.pyc
+scratch/
+debug/
+build/
+dist/
+*.spec
+*.app/
+backups/
+.DS_Store
+node_modules/
+frontend-dist/
+src-tauri/target/
+playwright-report/
+test-results/
+
+# Local-only workspace files
+.DS_Store
+.cache/
+*.app/
+dist/
+build/

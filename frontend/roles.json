@@ -1,0 +1,174 @@
+{
+  "GK": {
+    "name": "Goalkeeper",
+    "duty": "Defend"
+  },
+  "SK": {
+    "name": "Sweeper Keeper",
+    "duty": "Support"
+  },
+  "CD": {
+    "name": "Central Defender",
+    "duty": "Defend"
+  },
+  "BPD": {
+    "name": "Ball Playing Defender",
+    "duty": "Defend"
+  },
+  "NCB": {
+    "name": "No-Nonsense Centre Back",
+    "duty": "Defend"
+  },
+  "WCB": {
+    "name": "Wide Centre Back",
+    "duty": "Support"
+  },
+  "L": {
+    "name": "Libero",
+    "duty": "Support"
+  },
+  "FB": {
+    "name": "Full Back",
+    "duty": "Defend"
+  },
+  "IFB": {
+    "name": "Inverted Full Back",
+    "duty": "Defend"
+  },
+  "WB": {
+    "name": "Wing Back",
+    "duty": "Support"
+  },
+  "CWB": {
+    "name": "Complete Wing Back",
+    "duty": "Attack"
+  },
+  "IWB": {
+    "name": "Inverted Wing Back",
+    "duty": "Support"
+  },
+  "DM": {
+    "name": "Defensive Midfielder",
+    "duty": "Defend"
+  },
+  "A": {
+    "name": "Anchor",
+    "duty": "Defend"
+  },
+  "HB": {
+    "name": "Half Back",
+    "duty": "Defend"
+  },
+  "BWM": {
+    "name": "Ball Winning Midfielder",
+    "duty": "Defend"
+  },
+  "DLP": {
+    "name": "Deep Lying Playmaker",
+    "duty": "Support"
+  },
+  "RGA": {
+    "name": "Regista",
+    "duty": "Support"
+  },
+  "RPM": {
+    "name": "Roaming Playmaker",
+    "duty": "Support"
+  },
+  "SV": {
+    "name": "Segundo Volante",
+    "duty": "Support"
+  },
+  "CM": {
+    "name": "Central Midfielder",
+    "duty": "Support"
+  },
+  "BBM": {
+    "name": "Box To Box Midfielder",
+    "duty": "Support"
+  },
+  "AP": {
+    "name": "Advanced Playmaker",
+    "duty": "Support"
+  },
+  "MEZ": {
+    "name": "Mezzala",
+    "duty": "Support"
+  },
+  "CAR": {
+    "name": "Carrilero",
+    "duty": "Support"
+  },
+  "WM": {
+    "name": "Wide Midfielder",
+    "duty": "Support"
+  },
+  "W": {
+    "name": "Winger",
+    "duty": "Attack"
+  },
+  "IW": {
+    "name": "Inverted Winger",
+    "duty": "Support"
+  },
+  "IF": {
+    "name": "Inside Forward",
+    "duty": "Attack"
+  },
+  "WP": {
+    "name": "Wide Playmaker",
+    "duty": "Support"
+  },
+  "DW": {
+    "name": "Defensive Winger",
+    "duty": "Support"
+  },
+  "RMD": {
+    "name": "Raumdeuter",
+    "duty": "Attack"
+  },
+  "AM": {
+    "name": "Attacking Midfielder",
+    "duty": "Support"
+  },
+  "SS": {
+    "name": "Shadow Striker",
+    "duty": "Attack"
+  },
+  "EG": {
+    "name": "Enganche",
+    "duty": "Support"
+  },
+  "T": {
+    "name": "Trequartista",
+    "duty": "Attack"
+  },
+  "AF": {
+    "name": "Advanced Forward",
+    "duty": "Attack"
+  },
+  "P": {
+    "name": "Poacher",
+    "duty": "Attack"
+  },
+  "DLF": {
+    "name": "Deep Lying Forward",
+    "duty": "Support"
+  },
+  "CF": {
+    "name": "Complete Forward",
+    "duty": "Support"
+  },
+  "TM": {
+    "name": "Target Forward",
+    "duty": "Attack"
+  },
+  "PF": {
+    "name": "Pressing Forward",
+    "duty": "Support"
+  },
+  "F9": {
+    "name": "False Nine",
+    "duty": "Support"
+  }
+}
