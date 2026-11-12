@@ -40,6 +40,22 @@ const rows: Row[] = [
   },
 ];
 describe("filter parity", () => {
+  it("filters independent listing flags without treating unknown values as listed", () => {
+    const input = [
+      { ...rows[0], UID: 1, TransferListed: true, LoanListed: false },
+      { ...rows[0], UID: 2, TransferListed: false, LoanListed: true },
+      { ...rows[0], UID: 3, TransferListed: true, LoanListed: true },
+      { ...rows[0], UID: 4, TransferListed: null, LoanListed: null },
+      { ...rows[0], UID: 5, TransferListed: false, LoanListed: false },
+    ];
+    const ids = (listing: string) => filterPlayers(input, { ...defaults, listing }, "2031-08-17", 1).map(r => r.UID);
+    expect(ids("All")).toEqual([1, 2, 3, 4, 5]);
+    expect(ids("Transfer")).toEqual([1, 3]);
+    expect(ids("Loan")).toEqual([2, 3]);
+    expect(ids("Either")).toEqual([1, 2, 3]);
+    expect(csv([input[0]], 1, "$", { columns: ["Name", "TransferListed", "LoanListed"] }))
+      .toContain('"true","false"');
+  });
   it("calculates market minus sale for the selected scenario, sorting and CSV currency", () => {
     const result = filterPlayers(rows, { ...defaults, sort: "ValueDifference" }, "2031-08-17", 1);
     expect(result[0].ValueDifference).toBe(-887300);

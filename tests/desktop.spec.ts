@@ -250,3 +250,43 @@ test('market minus sale column displays, sorts and exports the selected scenario
  expect(exports[0].contents).toContain('"ValueDifference"');
  expect(exports[0].contents).toContain('"300000"');
 });
+
+test('player listing badges sit before names and listing filters support both statuses',async({page})=>{
+ const data=structuredClone(fixture);
+ Object.assign(data.players[0],{TransferListed:true,LoanListed:false});
+ Object.assign(data.players[1],{TransferListed:false,LoanListed:true});
+ Object.assign(data.players[2],{TransferListed:true,LoanListed:true});
+ Object.assign(data.players[3],{TransferListed:false,LoanListed:false});
+ Object.assign(data.players[4],{TransferListed:null,LoanListed:null});
+ await setup(page,data);
+ const row=(i:number)=>page.getByRole('row',{name:'Open '+data.players[i].Name,exact:true});
+ await expect(row(0).getByLabel('Transfer listed',{exact:true})).toHaveText('Trn');
+ await expect(row(0).getByLabel('Loan listed',{exact:true})).toHaveCount(0);
+ await expect(row(1).getByLabel('Loan listed',{exact:true})).toHaveText('Loa');
+ await expect(row(2).locator('.listing-badge')).toHaveCount(2);
+ await expect(row(3).locator('.listing-badge')).toHaveCount(0);
+ await expect(row(4).locator('.listing-badge')).toHaveCount(0);
+ const badgeBox=(await row(0).locator('.listing-badge').boundingBox())!;
+ const nameBox=(await row(0).locator('.player-name-text').boundingBox())!;
+ expect(badgeBox.x+badgeBox.width).toBeLessThan(nameBox.x);
+ await page.screenshot({path:'test-results/listing-badges.png',fullPage:true});
+ await page.getByText('Settings',{exact:true}).click();
+ await page.getByLabel('Night theme',{exact:true}).check();
+ await expect(row(0).getByLabel('Transfer listed',{exact:true})).toBeVisible();
+ await page.screenshot({path:'test-results/listing-badges-night.png',fullPage:true});
+ await page.locator('summary').getByText('Market',{exact:true}).click();
+ const listing=page.getByLabel('Listing status',{exact:true});
+ for(const [value,count] of [['Transfer',2],['Loan',2],['Either',3]] as const){
+  await listing.selectOption(value);
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await expect(page.locator('.results-controls')).toContainText(count+' players');
+ }
+ await page.getByRole('button',{name:'Reset filters',exact:true}).click();
+ await expect(listing).toHaveValue('All');
+ await expect(page.locator('.results-controls')).toContainText('6 players');
+ await row(0).getByLabel('Transfer listed',{exact:true}).click();
+ await expect(page.getByRole('heading',{name:data.players[0].Name,exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Back to Player List'}).click();
+ await page.getByRole('button',{name:'Staff',exact:true}).click();
+ await expect(page.locator('.listing-badge')).toHaveCount(0);
+});

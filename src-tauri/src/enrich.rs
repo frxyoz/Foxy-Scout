@@ -71,6 +71,9 @@ pub fn enrich_players(players: &mut [Value], game_date: &str) {
         };
         let mut row = json!({"Name":p["name"],"UID":n(p,"uid"),"Nation":p["nation"].as_str().unwrap_or(""),"Club":p["club"].as_str().filter(|s|!s.is_empty()).unwrap_or("-"),"Age":p["age"],"CA":p["ca"],"PA":p["pa"],"Diff":n(p,"pa")-n(p,"ca"),"Rep":n(p,"reputation"),"BestPos":pos_str,"Height":n(p,"height"),"Weight":if n(p,"weight")==0{Value::Null}else{p["weight"].clone()},"Foot":p["foot"].as_str().unwrap_or(""),"LeftFoot":foot(n(&a,"LF")),"RightFoot":foot(n(&a,"RF")),"DoB":dob,"Contract":contract,"Wage":if wage==0{Value::Null}else{json!(wage)},"Gender":p["gender"].as_str().unwrap_or("M")});
         let report = ratings::player_role_report(&a, &pos, n(p, "ca"), n(p, "pa"), n(p, "age"));
+        let listing_flags = p["contract_listing_flags"].as_u64();
+        row["TransferListed"] = json!(listing_flags.map(|flags| flags & 1 != 0));
+        row["LoanListed"] = json!(listing_flags.map(|flags| flags & 2 != 0));
         row["Role"] = report["best_role"][0].clone();
         row["RoleRtg"] =
             json!((report["best_role"][1].as_f64().unwrap_or(0.0) * 5.0).round_ties_even() as i64);
@@ -153,6 +156,24 @@ const POSITIONS: &[&str] = &[
 #[cfg(test)]
 mod parity_tests {
     use super::*;
+    #[test]
+    fn listing_badges_preserve_independent_flags_and_unknown_status() {
+        let mut players: Vec<Value> = [None, Some(0), Some(1), Some(2), Some(3), Some(65)]
+            .into_iter().map(|flags| json!({
+                "attributes": {}, "positions": {}, "personality": {},
+                "ca": 100, "pa": 120, "age": 21, "contract_listing_flags": flags,
+            })).collect();
+        enrich_players(&mut players, "2031-08-17");
+        for (player, (transfer, loan)) in players.iter().zip([
+            (None, None), (Some(false), Some(false)),
+            (Some(true), Some(false)), (Some(false), Some(true)),
+            (Some(true), Some(true)), (Some(true), Some(false)),
+        ]) {
+            assert_eq!(player["TransferListed"], json!(transfer));
+            assert_eq!(player["LoanListed"], json!(loan));
+        }
+        assert_eq!(players[1]["SaleValue"], players[2]["SaleValue"]);
+    }
     #[test]
     #[ignore = "requires local private migration baselines"]
     fn full_dataframe_parity() {

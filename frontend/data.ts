@@ -162,6 +162,8 @@ export const labels: Record<string, string> = {
   MarketValue: "Market Value",
   SaleValue: "Sale Value",
   ValueDifference: "Market − Sale",
+  TransferListed: "Transfer listed",
+  LoanListed: "Loan listed",
   ReleaseClause: "Release cap",
   SaleValueBasis: "Sale basis",
   Wage: "Annual wage",
@@ -219,6 +221,8 @@ export const extras = [
   "SaleValue",
   "ValueDifference",
   "ReleaseClause",
+  "TransferListed",
+  "LoanListed",
   "SaleValueBasis",
   "Contract",
   "Wage",
@@ -249,6 +253,7 @@ export type Filters = {
   basis: string;
   scenario: string;
   contract: string;
+  listing: string;
   sort: string;
 };
 export const defaults: Filters = {
@@ -266,6 +271,7 @@ export const defaults: Filters = {
   basis: "MarketValue",
   scenario: "Any club",
   contract: "All",
+  listing: "All",
   sort: "CA",
 };
 export function scenarioRows(rows: Row[], scenario: string): Row[] {
@@ -302,6 +308,9 @@ export function filterPlayers(
   const day = Date.parse(date);
   return scenarioRows(rows, f.scenario)
     .filter((r) => {
+      if (f.listing === "Transfer" && r.TransferListed !== true) return false;
+      if (f.listing === "Loan" && r.LoanListed !== true) return false;
+      if (f.listing === "Either" && r.TransferListed !== true && r.LoanListed !== true) return false;
       if (
         !between(r.Age, f.age) ||
         !between(r.CA, f.ca) ||

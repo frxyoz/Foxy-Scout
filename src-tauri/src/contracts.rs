@@ -108,7 +108,7 @@ fn formatted(day: u16, year: u16) -> Option<String> {
     Some(date.format("%d/%m/%Y").to_string())
 }
 pub fn read_contract(data: &[u8], anchor: usize, hi: usize, fm_version: i32) -> Value {
-    let mut out = json!({"contract_offset":anchor,"contract_end":null,"contract_end_day":0,"contract_end_year":0,"contract_type":null,"wage":0,"wage_bonus":0,"wage_annual_usd":0,"contract_start_season":0,"release_clauses":read_release_clauses(data,anchor,anchor.saturating_sub(600),hi,fm_version)});
+    let mut out = json!({"contract_offset":anchor,"contract_end":null,"contract_end_day":0,"contract_end_year":0,"contract_type":null,"contract_listing_flags":null,"wage":0,"wage_bonus":0,"wage_annual_usd":0,"contract_start_season":0,"release_clauses":read_release_clauses(data,anchor,anchor.saturating_sub(600),hi,fm_version)});
     let Some(day) = u16_at(data, anchor + 26) else {
         return out;
     };
@@ -124,6 +124,17 @@ pub fn read_contract(data: &[u8], anchor: usize, hi: usize, fm_version: i32) -> 
             out["contract_end_day"] = json!(day);
             out["contract_end_year"] = json!(year);
             out["contract_type"] = json!("Full Contract")
+        }
+    }
+    // FM24's contract core starts at anchor + 14. Its listing bitfield is
+    // core byte 23 (before the variable-length contract event ring).
+    // Bits 0 and 1 indicate transfer and loan listings independently.
+    // Layout cross-check: https://github.com/Napas/fm-mcp/blob/main/docs/format/contracts.md
+    // Local FM24 bytes match that layout; an independent in-game comparison
+    // of FM24 listing labels is still pending.
+    if fm_version == 24 && !out["contract_type"].is_null() && anchor + 44 <= hi {
+        if let Some(flags) = data.get(anchor + 37).filter(|b| **b != u8::MAX) {
+            out["contract_listing_flags"] = json!(flags);
         }
     }
     let mut p = anchor + 44;
@@ -154,7 +165,7 @@ pub fn extract_contracts_v2(data: &[u8], records: &mut [Value], fm_version: i32,
         .collect();
     offsets.sort_unstable();
     for rec in records {
-        for (k,v)in json!({"release_clauses":null,"contract_end":null,"contract_end_day":0,"contract_end_year":0,"contract_type":null,"contract_offset":null,"contract_start_season":0,"wage":0,"wage_annual_usd":0,"wage_bonus":0,"signed":null}).as_object().unwrap(){rec[k]=v.clone()}
+        for (k,v)in json!({"release_clauses":null,"contract_end":null,"contract_end_day":0,"contract_end_year":0,"contract_type":null,"contract_offset":null,"contract_listing_flags":null,"contract_start_season":0,"wage":0,"wage_annual_usd":0,"wage_bonus":0,"signed":null}).as_object().unwrap(){rec[k]=v.clone()}
         let off = rec["offset"].as_u64().unwrap_or(0) as usize;
         if off + size >= data.len() {
             continue;
@@ -190,6 +201,26 @@ pub fn extract_contracts_v2(data: &[u8], records: &mut [Value], fm_version: i32,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fm24_contract_listing_flags_are_before_the_event_ring() {
+        // Local FM24 contract prefixes covering low flag bits 0, 1, 2, 3.
+        // These check extraction, not independent in-game label verification.
+        for (hex, flags) in [
+            ("ff030400000000000000f007000000000000ffffffffffffffff6e01f007c12cea0701010300000000000000", 0),
+            ("ff030400000000000000ee07000080730000ffffffffffffffffb600f007a800e6071616030107000a000000", 1),
+            ("ff030400000007000000ee0700002d000000d80500000c180000b600f0075700e807070e0a02000503000000", 2),
+            ("ff030400000004030000ed070000a0060000ffffffffffffffffb600f007e72eec0716160703050304000000", 3),
+        ] {
+            let bytes: Vec<u8> = (0..hex.len()).step_by(2)
+                .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
+            let result = read_contract(&bytes, 0, bytes.len(), 24);
+            assert_eq!(result["contract_listing_flags"], flags);
+            assert!(read_contract(&bytes, 0, 37, 24)["contract_listing_flags"].is_null());
+            assert!(read_contract(&bytes, 0, bytes.len(), 26)["contract_listing_flags"].is_null());
+        }
+        let bytes = vec![0; 44];
+        assert!(read_contract(&bytes, 0, bytes.len(), 24)["contract_listing_flags"].is_null());
+    }
     #[test]
     fn clauses_exclude_bonus() {
         let mut d = vec![0; 105];

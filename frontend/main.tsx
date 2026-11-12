@@ -390,7 +390,13 @@ function DataTable({
                     }
                     title={text(r[k])}
                   >
-                    {isMoney(k) ? (
+                    {k === "Name" && !staff ? (
+                      <span className="player-name">
+                        {r.TransferListed === true && <span className="listing-badge transfer-listed" role="img" title="Transfer listed" aria-label="Transfer listed">Trn</span>}
+                        {r.LoanListed === true && <span className="listing-badge loan-listed" role="img" title="Loan listed" aria-label="Loan listed">Loa</span>}
+                        <span className="player-name-text">{text(r.Name)}</span>
+                      </span>
+                    ) : isMoney(k) ? (
                       <MoneyCell value={r[k]} factor={factor} symbol={symbol} />
                     ) : max ? (
                       <span className="score-cell">
@@ -1338,6 +1344,14 @@ function App() {
                     ].map((x) => (
                       <option key={x}>{x}</option>
                     ))}
+                  </select>
+                </Field>
+                <Field label="Listing status">
+                  <select value={draft.listing} onChange={(e) => setFilter("listing", e.target.value)}>
+                    <option value="All">All players</option>
+                    <option value="Transfer">Transfer listed</option>
+                    <option value="Loan">Loan listed</option>
+                    <option value="Either">Transfer or loan listed</option>
                   </select>
                 </Field>
               </div>

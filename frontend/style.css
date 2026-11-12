@@ -446,6 +446,41 @@ table.results {
   font-weight: 550;
   border-right: 1px solid var(--line);
 }
+.player-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.player-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.listing-badge {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: .02em;
+}
+.transfer-listed {
+  background: #fce4bc;
+  color: #743b00;
+}
+.loan-listed {
+  background: #d6edda;
+  color: #1b582b;
+}
+:root[data-theme="night"] .transfer-listed {
+  background: #684318;
+  color: #ffe2b4;
+}
+:root[data-theme="night"] .loan-listed {
+  background: #244f32;
+  color: #c1edcb;
+}
 .results th:first-child {
   position: sticky;
   left: 0;

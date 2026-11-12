@@ -10,7 +10,7 @@ use std::{
     time::{Instant, UNIX_EPOCH},
 };
 
-const SCHEMA: &str = "foxy-rust-fm24-v3";
+const SCHEMA: &str = "foxy-rust-fm24-v4";
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Snapshot {
     pub players: Vec<Value>,
@@ -234,6 +234,27 @@ mod tests {
                 .unwrap()
                 .cache_hit
         );
+    }
+    #[test]
+    fn listing_flags_survive_snapshot_compaction_and_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("save.fm");
+        let cache = dir.path().join("cache");
+        fs::write(&path, b"save").unwrap();
+        let snapshot = load_save_at(&path, false, &cache, |p| {
+            let mut result = fixture(p)?;
+            result.players.push(serde_json::json!({
+                "attributes": {}, "positions": {}, "personality": {},
+                "contract_listing_flags": 3,
+            }));
+            Ok(result)
+        }).unwrap();
+        assert_eq!(snapshot.players[0]["TransferListed"], true);
+        assert_eq!(snapshot.players[0]["LoanListed"], true);
+        assert!(snapshot.players[0].get("contract_listing_flags").is_none());
+        let cached = load_save_at(&path, false, &cache, |_| panic!("must use cache")).unwrap();
+        assert!(cached.cache_hit);
+        assert_eq!(cached.players, snapshot.players);
     }
     #[test]
     fn older_nationality_cache_is_rebuilt() {
