@@ -16,7 +16,14 @@ import {
   defaults,
   filterPlayers,
   compare,
+  searchColumns,
+  matchesSearch,
+  matchesColumnRules,
+  ColumnRule,
+  ruleError,
 } from "./data";
+import { ColumnFilters } from "./ColumnFilters";
+import { AppHeader } from "./AppHeader";
 import { ExportDialog } from "./ExportDialog";
 import logo from "./assets/fox-logo.png";
 import "./style.css";
@@ -449,10 +456,12 @@ function Attributes({
   row,
   keys,
   title,
+  playerColors = false,
 }: {
   row: Row;
   keys: string[];
   title: string;
+  playerColors?: boolean;
 }) {
   return (
     <section className="attribute-group">
@@ -463,10 +472,16 @@ function Attributes({
             <dt>{names[k] || k}</dt>
             <dd
               className={
-                row[k] >= 16 && !["Dirt", "InjP", "Contr"].includes(k)
+                playerColors && typeof row[k] === "number" && row[k] >= 1 && row[k] <= 20
+                  ? "attribute-tone-" + (() => {
+                      const value = ["Dirt", "InjP", "Contr"].includes(k) ? 21 - row[k] : row[k];
+                      return value <= 5 ? "low" : value <= 10 ? "medium" : value <= 15 ? "good" : "high";
+                    })()
+                  : !playerColors && row[k] >= 16 && !["Dirt", "InjP", "Contr"].includes(k)
                   ? "strong"
                   : ""
               }
+              title={playerColors && ["Dirt", "InjP", "Contr"].includes(k) ? "Lower is better" : undefined}
             >
               {text(row[k])}
             </dd>
@@ -663,22 +678,25 @@ function Report({
         <>
           <div className="sheet">
             <div className="attribute-grid">
-              <Attributes row={row} keys={groups.Technical} title="Technical" />
-              <Attributes row={row} keys={groups.Mental} title="Mental" />
+              <Attributes playerColors row={row} keys={groups.Technical} title="Technical" />
+              <Attributes playerColors row={row} keys={groups.Mental} title="Mental" />
               <div>
-                <Attributes row={row} keys={groups.Physical} title="Physical" />
+                <Attributes playerColors row={row} keys={groups.Physical} title="Physical" />
                 <Attributes
+                  playerColors
                   row={row}
                   keys={groups.Hidden}
                   title="Hidden & feet"
                 />
               </div>
               <Attributes
+                playerColors
                 row={row}
                 keys={groups.Goalkeeping}
                 title="Goalkeeping"
               />
               <Attributes
+                playerColors
                 row={row}
                 keys={groups.Personality}
                 title="Personality"
@@ -962,6 +980,7 @@ function App() {
       attr: "Attacking",
       min: 1,
       sort: "CA",
+      columnRules: [] as ColumnRule[],
     }),
     [sfApplied, setSfApplied] = useState(sf);
   const view = views[mode],
@@ -1017,6 +1036,10 @@ function App() {
     () => filterPlayers(players, filters, snapshot?.game_date || "", factor),
     [players, filters, snapshot?.game_date, factor],
   );
+  const searchableColumns = useMemo(() => searchColumns(
+    mode === "Staff" ? staff : players,
+    mode === "Staff" ? ["Name", "Nation", "Age", "CA", "PA", "UID", ...Object.values(staffGroups).flat()] : ["Name", ...extras, ...Object.values(groups).flat(), ...positions.map(p => "Pos_" + p)],
+  ), [snapshot, staff, mode]);
   const filteredStaff = useMemo(
     () =>
       staff
@@ -1027,11 +1050,8 @@ function App() {
             r[sfApplied.attr] >= sfApplied.min &&
             (!sfApplied.nations.length ||
               sfApplied.nations.includes(r.Nation)) &&
-            (!sfApplied.search.trim() ||
-              String(r.Name)
-                .toLowerCase()
-                .includes(sfApplied.search.trim().toLowerCase()) ||
-              String(r.UID).includes(sfApplied.search.trim())),
+            matchesSearch(r, sfApplied.search, factor) &&
+            matchesColumnRules(r, sfApplied.columnRules, factor),
         )
         .sort((a, b) =>
           compare(
@@ -1040,7 +1060,7 @@ function App() {
             ["Name", "Age"].includes(sfApplied.sort),
           ),
         ),
-    [staff, sfApplied],
+    [staff, sfApplied, factor],
   );
   const baseRows = mode === "Staff" ? filteredStaff : filtered;
   const rows = useMemo(
@@ -1227,6 +1247,7 @@ function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (draft.columnRules.some(ruleError)) return;
               setFilters(draft);
               setSort(null);
               setSelected([]);
@@ -1236,9 +1257,9 @@ function App() {
             <details open>
               <summary>Players</summary>
               <div className="details-content">
-                <Field label="Player or UID">
+                <Field label="Search players">
                   <input
-                    placeholder="Search a player…"
+                    placeholder="Search any column…"
                     value={draft.search}
                     onChange={(e) => setFilter("search", e.target.value)}
                   />
@@ -1383,7 +1404,8 @@ function App() {
                 ))}
               </select>
             </Field>
-            <button className="primary" type="submit">
+            <ColumnFilters columns={searchableColumns} rules={draft.columnRules} onChange={v => setFilter("columnRules", v)} currency={currency}/>
+            <button className="primary" type="submit" disabled={draft.columnRules.some(rule => !!ruleError(rule))}>
               Apply filters
             </button>
             <button
@@ -1403,14 +1425,16 @@ function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (sf.columnRules.some(ruleError)) return;
               setSfApplied(sf);
               setSort(null);
             }}
           >
             <h2 className="sidebar-title">Staff filters</h2>
-            <Field label="Staff name or UID">
+            <Field label="Search staff">
               <input
                 value={sf.search}
+                placeholder="Search any column…"
                 onChange={(e) => setSf({ ...sf, search: e.target.value })}
               />
             </Field>
@@ -1465,12 +1489,17 @@ function App() {
                 ))}
               </select>
             </Field>
-            <button className="primary">Apply staff filters</button>
+            <ColumnFilters columns={searchableColumns} rules={sf.columnRules} onChange={v => setSf({ ...sf, columnRules: v })} currency={currency}/>
+            <button className="primary" disabled={sf.columnRules.some(rule => !!ruleError(rule))}>Apply staff filters</button>
+            <button type="button" className="text-button" onClick={() => {
+              const reset = { search: "", age: [18, 80] as [number, number], nations: [] as string[], attr: "Attacking", min: 1, sort: "CA", columnRules: [] as ColumnRule[] };
+              setSf(reset); setSfApplied(reset); setSort(null);
+            }}>Reset staff filters</button>
           </form>
         )}
-        <details className="settings">
-          <summary>Settings</summary>
-          <div className="details-content">
+      </aside>
+      <main>
+        <AppHeader onAbout={() => setView("about")} onQuit={() => invoke("quit_app").catch(e => setError(String(e)))} settings={<>
             <Field label="Currency">
               <select
                 value={currency}
@@ -1499,27 +1528,7 @@ function App() {
               />{" "}
               Night theme
             </label>
-          </div>
-        </details>
-      </aside>
-      <main>
-        <header>
-          <span>Football Manager 2024</span>
-          <div>
-            <button
-              onClick={() => setView(view === "about" ? "list" : "about")}
-            >
-              About
-            </button>
-            <button
-              onClick={() =>
-                invoke("quit_app").catch((e) => setError(String(e)))
-              }
-            >
-              Quit
-            </button>
-          </div>
-        </header>
+        </>}/>
         {error && (
           <div className="error" role="alert">
             {error}
@@ -1544,11 +1553,14 @@ function App() {
             <button onClick={() => setView("list")}>
               ← Back to {mode.toLowerCase()}
             </button>
-            <h2>About Foxy Scout</h2>
-            <p>
-              A local scouting companion for Football Manager 2024. Save files
-              are read on your computer and never modified.
-            </p>
+            <div className="about-hero">
+              <img src={logo} alt=""/>
+              <div><p className="eyebrow">YOUR LOCAL SCOUTING DESK</p><h1>About Foxy Scout</h1>
+                <p>Find the right player. See the full picture.</p>
+                <div className="about-tags"><span>Version 2.0</span><span>Football Manager 2024</span><span>Read-only saves</span></div>
+              </div>
+            </div>
+            <p className="about-intro">Explore players and staff, compare attributes, and build a shortlist from your own FM24 save. Your save stays on your computer and is never modified.</p>
             {snapshot && (
               <Details
                 items={[
@@ -1575,14 +1587,16 @@ function App() {
                 ]}
               />
             )}
-            <h3>Data and estimates</h3>
+            <div className="about-grid"><section className="about-card">
+            <h3>What comes from your save</h3>
             <p>
               CA, PA, attributes and position familiarity are extracted from the
               save. Player scouting uses confirmed ages 15–40. Staff has
               separate coaching, scouting, mental and medical sheets. Staff
               employers, job titles and contracts are not decoded.
             </p>
-            <p>
+            <p className="muted">Transfer and loan badges come from contract flags. Their FM24 labels are awaiting independent in-game confirmation.</p>
+            </section><section className="about-card"><h3>Understand the estimates</h3><p>
               Market Value estimates financial worth from ability, age,
               contracts and the save’s wage economy. Sale Value estimates an
               asking price from contract leverage and youth headroom. Applicable
@@ -1591,23 +1605,25 @@ function App() {
               estimates, not guaranteed offers or Football Manager’s own
               calculated values.
             </p>
-            <h3>How to use</h3>
+            </section><section className="about-card"><h3>Build a better search</h3>
             <ol>
               <li>Choose an FM24 .fm save and load it.</li>
               <li>
-                Apply filters and choose a table view. Select a player to open
-                the full report.
+                Search across columns, or add column conditions for specific attributes, prices, dates, or listing statuses. Every condition must match.
               </li>
               <li>
                 Turn on Compare, select 2–6 players, and open the comparison.
               </li>
             </ol>
+            </section><section className="about-card"><h3>Made for your desktop</h3>
             <p>
               Parsed data and ratings are cached locally. Changed saves rebuild
               on the next load. Select Rebuild cached save to parse again.
               Currency settings convert the display and exports; stored amounts
               remain USD.
             </p>
+            <p>Open Settings at the top right to change currency or theme. More app actions contains Quit.</p>
+            </section></div>
             <p className="muted">
               Unofficial fan-made tool, not affiliated with Sports Interactive
               or SEGA. Football Manager is a trademark of Sports Interactive

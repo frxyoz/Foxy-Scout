@@ -254,6 +254,7 @@ export type Filters = {
   scenario: string;
   contract: string;
   listing: string;
+  columnRules: ColumnRule[];
   sort: string;
 };
 export const defaults: Filters = {
@@ -272,6 +273,7 @@ export const defaults: Filters = {
   scenario: "Any club",
   contract: "All",
   listing: "All",
+  columnRules: [],
   sort: "CA",
 };
 export function scenarioRows(rows: Row[], scenario: string): Row[] {
@@ -304,10 +306,10 @@ export function filterPlayers(
   factor: number,
 ): Row[] {
   const between = (x: number, r: number[]) => x >= r[0] && x <= r[1];
-  const search = f.search.trim().toLowerCase();
   const day = Date.parse(date);
   return scenarioRows(rows, f.scenario)
     .filter((r) => {
+      if (!matchesSearch(r, f.search, factor) || !matchesColumnRules(r, f.columnRules, factor)) return false;
       if (f.listing === "Transfer" && r.TransferListed !== true) return false;
       if (f.listing === "Loan" && r.LoanListed !== true) return false;
       if (f.listing === "Either" && r.TransferListed !== true && r.LoanListed !== true) return false;
@@ -317,12 +319,6 @@ export function filterPlayers(
         !between(r.PA, f.pa) ||
         !between(r.RoleRtg ?? 0, f.rating) ||
         !between(r.PotRtg ?? 0, f.potential)
-      )
-        return false;
-      if (
-        search &&
-        !String(r.Name).toLowerCase().includes(search) &&
-        !(/^\d+$/.test(search) && String(r.UID).includes(search))
       )
         return false;
       if (
@@ -413,4 +409,80 @@ export function csv(
       ...converted.map((r) => keys.map((k) => escape(r[k])).join(delimiter)),
     ].join("\r\n")
   );
+}
+
+export type ColumnKind = "number" | "text" | "boolean" | "date";
+export type SearchColumn = { key: string; label: string; kind: ColumnKind };
+export type ColumnRule = { column: string; operator: string; value: string };
+export const columnLabel = (key: string) => labels[key] || names[key] || key.replace(/^Pos_/, "Position: ").replace(/([a-z])([A-Z])/g, "$1 $2");
+export function searchColumns(rows: Row[], candidates: string[]): SearchColumn[] {
+  const kinds = new Map<string, ColumnKind>();
+  for (const row of rows) {
+    for (const [key, value] of Object.entries(row)) {
+      if (!/^[A-Z]/.test(key) && key !== "1v1") continue;
+      if (value == null || typeof value === "object" || kinds.has(key)) continue;
+      kinds.set(key, typeof value === "number" ? "number" : typeof value === "boolean" ? "boolean" : "text");
+    }
+  }
+  const numeric = new Set(["Age", "CA", "PA", "Diff", "Rep", "Reputation", "RoleRtg", "PotRtg", "UID", "Height", "Weight", ...Object.values(groups).flat(), ...Object.values(staffGroups).flat()]);
+  for (const key of candidates) if (!kinds.has(key)) kinds.set(key,
+    isMoney(key) || numeric.has(key) || key.startsWith("Pos_") ? "number"
+    : ["TransferListed", "LoanListed"].includes(key) ? "boolean" : "text");
+  return [...kinds].map(([key, kind]) => ({ key, label: columnLabel(key), kind: key === "DoB" || key === "Contract" ? "date" as const : kind }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+export function ruleError(rule: ColumnRule): string | null {
+  if (["empty", "present"].includes(rule.operator)) return null;
+  if (!rule.value.trim()) return "Enter a value or remove this filter.";
+  if (["gt", "gte", "lt", "lte", "number_eq", "number_ne"].includes(rule.operator) && !Number.isFinite(Number(rule.value))) return "Enter a valid number.";
+  if (["before", "after"].includes(rule.operator) && !/^\d{4}-\d{2}-\d{2}$/.test(rule.value)) return "Choose a date.";
+  return null;
+}
+export function matchesColumnRules(row: Row, rules: ColumnRule[], factor: number): boolean {
+  return rules.every(rule => {
+    if (ruleError(rule)) return false;
+    const raw = row[rule.column];
+    const missing = raw == null || raw === "";
+    if (rule.operator === "empty") return missing;
+    if (rule.operator === "present") return !missing;
+    if (missing) return false;
+    const value = rule.value.trim();
+    if (["gt", "gte", "lt", "lte", "number_eq", "number_ne"].includes(rule.operator)) {
+      if (typeof raw !== "number" || !Number.isFinite(raw)) return false;
+      const actual = isMoney(rule.column) ? Math.round(raw * factor) : raw;
+      const expected = Number(value);
+      switch (rule.operator) {
+        case "gt": return actual > expected;
+        case "gte": return actual >= expected;
+        case "lt": return actual < expected;
+        case "lte": return actual <= expected;
+        case "number_eq": return actual === expected;
+        case "number_ne": return actual !== expected;
+      }
+    }
+    if (rule.operator === "boolean") return typeof raw === "boolean" && raw === (value === "true");
+    if (rule.operator === "before" || rule.operator === "after") {
+      const actual = contractDate(raw);
+      const expected = Date.parse(value + "T00:00:00Z");
+      return actual != null && (rule.operator === "before" ? actual < expected : actual > expected);
+    }
+    const actual = String(raw).toLocaleLowerCase();
+    const expected = value.toLocaleLowerCase();
+    switch (rule.operator) {
+      case "contains": return actual.includes(expected);
+      case "not_contains": return !actual.includes(expected);
+      case "eq": return actual === expected;
+      case "ne": return actual !== expected;
+      case "starts": return actual.startsWith(expected);
+      case "ends": return actual.endsWith(expected);
+      default: return false;
+    }
+  });
+}
+export function matchesSearch(row: Row, query: string, factor: number): boolean {
+  const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const values = Object.entries(row).filter(([key, value]) => (/^[A-Z]/.test(key) || key === "1v1") && value != null && typeof value !== "object")
+    .map(([key, value]) => String(isMoney(key) && typeof value === "number" ? Math.round(value * factor) : value).toLocaleLowerCase());
+  return terms.every(term => values.some(value => value.includes(term)));
 }

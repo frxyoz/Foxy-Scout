@@ -27,7 +27,7 @@ test('player workflows preserve filters, reports, currency, export and compariso
  await setup(page);
  await expect(page.locator('.results-controls')).toContainText('6 players');
  await expect(page.locator('.results thead')).toContainText('PA − CA');
- await page.getByLabel('Player or UID',{exact:true}).fill('[');
+ await page.getByLabel('Search players',{exact:true}).fill('[');
  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
  await expect(page.locator('.results-controls')).toContainText('1 players');
  await page.getByRole('row',{name:'Open Alex [Young]',exact:true}).click();
@@ -47,12 +47,13 @@ test('player workflows preserve filters, reports, currency, export and compariso
  await page.getByText('Settings',{exact:true}).click();
  await page.getByLabel('Currency',{exact:true}).selectOption('USD');
  await page.getByLabel('Night theme',{exact:true}).check();
+ await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Export CSV',exact:true}).click();
  await page.getByRole('button',{name:'Save CSV',exact:true}).click();
  const exports=await page.evaluate(()=>(window as any).__exports);
  expect(exports).toHaveLength(1);expect(exports[0].contents).toContain('100000');
  expect(exports[0].contents).toContain('Alex [Young]');
- await page.screenshot({path:'assets/screenshot-players.png',fullPage:true});
+ await page.screenshot({path:'test-results/screenshot-players.png',fullPage:true});
  await page.reload();
  await page.getByText('Settings',{exact:true}).click();
  await expect(page.getByLabel('Currency',{exact:true})).toHaveValue('USD');
@@ -71,10 +72,10 @@ test('staff sheets and empty and error states',async({page})=>{
   await expect(page.locator('.staff-attributes')).toBeVisible();
  }
  await page.getByRole('button',{name:'Back to Staff List'}).click();
- await page.getByLabel('Staff name or UID',{exact:true}).fill('absent');
+ await page.getByLabel('Search staff',{exact:true}).fill('absent');
  await page.getByRole('button',{name:'Apply staff filters',exact:true}).click();
  await expect(page.getByText('No matches. Clear a filter to show more results.')).toBeVisible();
- await page.screenshot({path:'assets/screenshot-staff.png',fullPage:true});
+ await page.screenshot({path:'test-results/screenshot-staff.png',fullPage:true});
 });
 
 test('large real-save result sets render through the desktop IPC contract',async({page})=>{
@@ -85,7 +86,7 @@ test('large real-save result sets render through the desktop IPC contract',async
  const shown=baseline.table.filter((r:any)=>r.Age>=15&&r.Age<=40&&r.CA>=1&&r.PA>=1&&r.PA<=200);
  await expect(page.locator('.results-controls')).toContainText(shown.length.toLocaleString('en-US')+' players');
  expect(await page.locator('.results tbody tr').count()).toBeLessThan(60);
- await page.getByLabel('Player or UID',{exact:true}).fill('2002066982');
+ await page.getByLabel('Search players',{exact:true}).fill('2002066982');
  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
  await expect(page.getByRole('row',{name:'Open Tejay McGrann',exact:true})).toBeVisible();
  await page.getByRole('row',{name:'Open Tejay McGrann',exact:true}).click();
@@ -98,6 +99,7 @@ test('money cells abbreviate only at narrow widths and retain full accessible va
  await setup(page,data);
  await page.getByText('Settings',{exact:true}).click();
  await page.getByLabel('Currency',{exact:true}).selectOption('USD');
+ await page.keyboard.press('Escape');
  const cell=page.locator('.money-cell[aria-label="$123,456,789"]');
  await cell.scrollIntoViewIfNeeded();
  await expect(cell).toHaveText('$123,456,789');
@@ -289,4 +291,77 @@ test('player listing badges sit before names and listing filters support both st
  await page.getByRole('button',{name:'Back to Player List'}).click();
  await page.getByRole('button',{name:'Staff',exact:true}).click();
  await expect(page.locator('.listing-badge')).toHaveCount(0);
+});
+
+test('column filters combine hidden attributes, currency, text and staff conditions',async({page})=>{
+ const data=structuredClone(fixture);
+ Object.assign(data.players[0],{Consis:19,MarketValue:1000000,TransferListed:true});
+ Object.assign(data.players[1],{Consis:4,MarketValue:1000000});
+ await setup(page,data);
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await page.getByLabel('Currency',{exact:true}).selectOption('USD');
+ await page.keyboard.press('Escape');
+ await page.locator('summary').getByText('Column filters',{exact:true}).click();
+ await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
+ await page.getByLabel('Condition 1 column',{exact:true}).selectOption('Consis');
+ await page.getByLabel('Condition 1 value',{exact:true}).fill('19');
+ await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
+ await page.getByLabel('Condition 2 column',{exact:true}).selectOption('MarketValue');
+ await page.getByLabel('Condition 2 operator',{exact:true}).selectOption('lte');
+ await page.getByLabel('Condition 2 value',{exact:true}).fill('1000000');
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ await expect(page.locator('.results-controls')).toContainText('1 players');
+ await expect(page.getByRole('row',{name:'Open '+data.players[0].Name,exact:true})).toBeVisible();
+ await page.screenshot({path:'test-results/column-filters.png',fullPage:true});
+ await page.getByLabel('Condition 1 value',{exact:true}).fill('');
+ await expect(page.getByLabel('Condition 1 value',{exact:true})).toHaveValue('');
+ await expect(page.getByRole('button',{name:'Apply filters',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Reset filters',exact:true}).click();
+ await page.getByLabel('Search players',{exact:true}).fill('North FC');
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ const expected=data.players.filter((r:any)=>r.Club==='North FC').length;
+ await expect(page.locator('.results-controls')).toContainText(expected+' players');
+ await page.getByRole('button',{name:'Staff',exact:true}).click();
+ await page.locator('summary').getByText('Column filters',{exact:true}).click();
+ await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
+ await page.getByLabel('Condition 1 column',{exact:true}).selectOption('Physiotherapy');
+ await page.getByLabel('Condition 1 value',{exact:true}).fill('21');
+ await page.getByRole('button',{name:'Apply staff filters',exact:true}).click();
+ await expect(page.getByText('No matches. Clear a filter to show more results.')).toBeVisible();
+ await page.getByRole('button',{name:'Reset staff filters',exact:true}).click();
+ await expect(page.getByLabel('Condition 1 column',{exact:true})).toHaveCount(0);
+});
+
+test('top-right settings, About and app actions work without losing the current search',async({page})=>{
+ await setup(page);
+ await page.getByLabel('Search players',{exact:true}).fill('Alex');
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ const settings=page.getByRole('button',{name:'Settings',exact:true});
+ const box=(await settings.boundingBox())!;
+ expect(box.x).toBeGreaterThan(1000);
+ await settings.click();
+ await page.getByLabel('Night theme',{exact:true}).check();
+ await page.screenshot({path:'test-results/top-right-settings.png',fullPage:true});
+ await page.keyboard.press('Escape');
+ await expect(settings).toBeFocused();
+ await expect(page.getByRole('region',{name:'Settings',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'About Foxy Scout',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'About Foxy Scout',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Build a better search',exact:true})).toBeVisible();
+ await page.screenshot({path:'test-results/about-redesigned.png',fullPage:true});
+ await page.getByRole('button',{name:'Back to players'}).click();
+ await expect(page.getByLabel('Search players',{exact:true})).toHaveValue('Alex');
+ await expect(page.locator('.results-controls')).toContainText('1 players');
+ await page.getByRole('button',{name:'More app actions',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Quit Foxy Scout',exact:true})).toBeVisible();
+ await page.evaluate(()=>{
+  const original=(window as any).__TAURI_INTERNALS__.invoke;
+  (window as any).__quitCalled=false;
+  (window as any).__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   if(command==='quit_app'){(window as any).__quitCalled=true;return;}
+   return original(command,args);
+  };
+ });
+ await page.getByRole('button',{name:'Quit Foxy Scout',exact:true}).click();
+ expect(await page.evaluate(()=>(window as any).__quitCalled)).toBe(true);
 });
