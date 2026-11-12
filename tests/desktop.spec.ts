@@ -22,6 +22,82 @@ async function setup(page:Page,data=fixture){
  await expect(page.getByRole('heading',{name:'Player scouting',exact:true})).toBeVisible();
 }
 
+test('compact multi-selects toggle immediately, filter, reset and respect reduced motion',async({page})=>{
+ await setup(page);
+ const positions=page.getByRole('group',{name:'Positions',exact:true}).filter({has:page.getByRole('button',{name:'GK',exact:true})});
+ const gk=positions.getByRole('button',{name:'GK',exact:true});
+ const dl=positions.getByRole('button',{name:'DL',exact:true});
+ await gk.click();
+ await dl.focus();
+ await page.keyboard.press('Space');
+ await expect(gk).toHaveAttribute('aria-pressed','true');
+ await expect(dl).toHaveAttribute('aria-pressed','true');
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ await expect(page.locator('.results tbody tr[aria-label]')).toHaveCount(1);
+ await expect(page.getByRole('row',{name:'Open Sam Keeper',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Clear positions',exact:true}).click();
+ await expect(gk).toHaveAttribute('aria-pressed','false');
+ await expect(dl).toHaveAttribute('aria-pressed','false');
+ await expect(page.getByRole('button',{name:'Clear positions',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ await expect(page.locator('.results tbody tr[aria-label]')).toHaveCount(6);
+ await page.getByRole('button',{name:'Staff',exact:true}).click();
+ const nationality=page.locator('.multi-disclosure');
+ await nationality.locator('summary').click();
+ const first=nationality.getByRole('checkbox').first();
+ const name=await first.locator('..').innerText();
+ await nationality.getByRole('searchbox').fill(name.trim());
+ await first.check();
+ await expect(nationality.locator('summary')).toHaveText('1 selected');
+ await page.keyboard.press('Escape');
+ await expect(nationality).not.toHaveAttribute('open');
+ await page.getByRole('button',{name:'Clear nationality',exact:true}).click();
+ await expect(nationality.locator('summary')).toHaveText('Any nationality');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await nationality.locator('summary').click();
+ expect(await page.locator('.multi-content').evaluate(el=>getComputedStyle(el).animationName)).toBe('none');
+ await page.screenshot({path:'test-results/minimal-filters-light.png',fullPage:true});
+ await page.getByRole('button',{name:'Players',exact:true}).click();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await page.getByLabel('Appearance',{exact:true}).selectOption('dark');
+ await page.keyboard.press('Escape');
+ await gk.click();
+ await dl.click();
+ await page.screenshot({path:'test-results/minimal-filters-night.png',fullPage:true});
+});
+
+test('search shortcuts, pending feedback and searchable columns preserve workspace state',async({page})=>{
+ await setup(page);
+ await page.keyboard.press('Control+f');
+ const search=page.getByLabel('Search players',{exact:true});
+ await expect(search).toBeFocused();
+ await search.fill('Alex');
+ await expect(page.locator('.pending-label')).toHaveText('Unapplied changes');
+ await expect(page.locator('.results-controls')).toContainText('6 players');
+ await page.keyboard.press('Control+Enter');
+ await expect(page.locator('.results-controls')).toContainText('1 players');
+ await expect(page.locator('.pending-label')).toHaveCount(0);
+ await page.getByRole('button',{name:'Staff',exact:true}).click();
+ await expect(page.locator('.pending-label')).toHaveCount(0);
+ await page.keyboard.press('Control+f');
+ await expect(page.getByLabel('Search staff',{exact:true})).toBeFocused();
+ await page.getByRole('button',{name:'Players',exact:true}).click();
+ await expect(search).toHaveValue('Alex');
+ await page.getByText('Customize columns',{exact:true}).click();
+ await page.getByRole('searchbox',{name:'Find a column',exact:true}).fill('Consis');
+ const column=page.locator('.column-options input[type="checkbox"]').first();
+ await expect(column).toHaveCount(1);
+ await column.check();
+ await expect(page.locator('.results thead')).toContainText('Consis');
+ await page.keyboard.press('Escape');
+ await expect(page.locator('.column-picker')).not.toHaveAttribute('open');
+ await expect(page.locator('.column-picker summary')).toBeFocused();
+ await page.getByText('Customize columns',{exact:true}).click();
+ await expect(page.getByRole('searchbox',{name:'Find a column',exact:true})).toHaveValue('');
+ await page.getByRole('button',{name:'Restore default',exact:true}).click();
+ await expect(page.locator('.results thead')).not.toContainText('Consis');
+});
+
 test('player workflows preserve filters, reports, currency, export and comparison',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await setup(page);
@@ -46,7 +122,7 @@ test('player workflows preserve filters, reports, currency, export and compariso
  await page.getByRole('button',{name:'Back to Player List'}).click();
  await page.getByText('Settings',{exact:true}).click();
  await page.getByLabel('Currency',{exact:true}).selectOption('USD');
- await page.getByLabel('Night theme',{exact:true}).check();
+ await page.getByLabel('Appearance',{exact:true}).selectOption('dark');
  await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Export CSV',exact:true}).click();
  await page.getByRole('button',{name:'Save CSV',exact:true}).click();
@@ -57,7 +133,7 @@ test('player workflows preserve filters, reports, currency, export and compariso
  await page.reload();
  await page.getByText('Settings',{exact:true}).click();
  await expect(page.getByLabel('Currency',{exact:true})).toHaveValue('USD');
- await expect(page.getByLabel('Night theme',{exact:true})).toBeChecked();
+ await expect(page.getByLabel('Appearance',{exact:true})).toHaveValue('dark');
  expect(errors).toEqual([]);
 });
 
@@ -100,10 +176,12 @@ test('money cells abbreviate only at narrow widths and retain full accessible va
  await page.getByText('Settings',{exact:true}).click();
  await page.getByLabel('Currency',{exact:true}).selectOption('USD');
  await page.keyboard.press('Escape');
+ await page.keyboard.press('Escape');
  const cell=page.locator('.money-cell[aria-label="$123,456,789"]');
  await cell.scrollIntoViewIfNeeded();
  await expect(cell).toHaveText('$123,456,789');
  const handle=page.locator('th').filter({has:page.getByRole('button',{name:'Market Value',exact:true})}).locator('.resize');
+ await handle.scrollIntoViewIfNeeded();
  const box=(await handle.boundingBox())!;
  await page.mouse.move(box.x+3,box.y+12);await page.mouse.down();
  await page.mouse.move(box.x-90,box.y+12);await page.mouse.up();
@@ -273,7 +351,7 @@ test('player listing badges sit before names and listing filters support both st
  expect(badgeBox.x+badgeBox.width).toBeLessThan(nameBox.x);
  await page.screenshot({path:'test-results/listing-badges.png',fullPage:true});
  await page.getByText('Settings',{exact:true}).click();
- await page.getByLabel('Night theme',{exact:true}).check();
+ await page.getByLabel('Appearance',{exact:true}).selectOption('dark');
  await expect(row(0).getByLabel('Transfer listed',{exact:true})).toBeVisible();
  await page.screenshot({path:'test-results/listing-badges-night.png',fullPage:true});
  await page.locator('summary').getByText('Market',{exact:true}).click();
@@ -340,7 +418,7 @@ test('top-right settings, About and app actions work without losing the current 
  const box=(await settings.boundingBox())!;
  expect(box.x).toBeGreaterThan(1000);
  await settings.click();
- await page.getByLabel('Night theme',{exact:true}).check();
+ await page.getByLabel('Appearance',{exact:true}).selectOption('dark');
  await page.screenshot({path:'test-results/top-right-settings.png',fullPage:true});
  await page.keyboard.press('Escape');
  await expect(settings).toBeFocused();

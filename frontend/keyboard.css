@@ -1,0 +1,20 @@
+.keybind-bar { position: fixed; bottom: 0; left: 272px; right: 0; z-index: 7; display: flex; align-items: center; gap: 8px; padding: 6px 24px; background: var(--bg); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; overflow-x: auto; }
+.keybind-bar button { display: inline-flex; align-items: center; gap: 7px; border-color: transparent; background: transparent; color: var(--muted); min-height: 28px; padding: 4px 6px; white-space: nowrap; font-size: 11px; }
+.keybind-bar button:hover { color: var(--ink); background: var(--surface); }
+.keybind-bar kbd { font: inherit; color: var(--ink); }
+.keybind-sort { padding: 4px 6px; white-space: nowrap; }
+.keybind-bar .keybind-help { margin-left: auto; }
+.app:has(.keybind-bar) main { padding-bottom: 75px; }
+.app:has(.keybind-bar) .table-scroll { height: clamp(320px, calc(100vh - 350px), 900px); }
+.column-key { color: var(--muted); font-size: 9px; font-weight: 400; margin-right: 5px; }
+.export-dialog.shortcut-dialog { width: min(640px, calc(100vw - 32px)); }
+.shortcut-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.shortcut-title h2 { font-size: 20px; }
+.shortcut-dialog .shortcut-intro { margin: 14px 0; font-size: 12px; }
+.shortcut-list { margin: 0; font-size: 12px; }
+.shortcut-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; padding: 7px 0; border-bottom: 1px solid var(--track); }
+.shortcut-list dd { flex-shrink: 0; color: var(--muted); font-weight: 400; }
+.shortcut-list kbd { font: inherit; }
+.shortcut-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; font-size: 12px; padding-left: 20px; }
+@media (max-width: 900px) { .keybind-bar { left: 235px; padding-inline: 12px; gap: 3px; } .keybind-sort { display: none; } }
+@media (max-width: 650px) { .keybind-bar { left: 0; } .shortcut-list > div { flex-direction: column; gap: 4px; } .shortcut-list dd { text-align: left; } .shortcut-columns { grid-template-columns: 1fr; } }

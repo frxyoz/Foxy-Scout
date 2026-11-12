@@ -23,7 +23,11 @@ import {
   ruleError,
 } from "./data";
 import { ColumnFilters } from "./ColumnFilters";
+import { ColumnPicker } from "./ColumnPicker";
 import { AppHeader } from "./AppHeader";
+import { Preferences, Appearance, Accent, Motion, Density } from "./Preferences";
+import { SavedSearches, SearchConfiguration } from "./SavedSearches";
+import { KeybindBar, ShortcutGuide } from "./KeyboardShortcuts";
 import { ExportDialog } from "./ExportDialog";
 import logo from "./assets/fox-logo.png";
 import "./style.css";
@@ -156,28 +160,44 @@ function Multi({
   options: string[];
   onChange: (v: string[]) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const root = useRef<HTMLDetailsElement>(null);
+  const toggle = (option: string) => onChange(value.includes(option) ? value.filter(item => item !== option) : [...value, option]);
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) root.current?.removeAttribute("open");
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && root.current?.open) {
+        root.current.open = false;
+        root.current.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
+  }, []);
   return (
-    <Field label={label}>
-      <select
-        multiple
-        value={value}
-        onChange={(e) =>
-          onChange(Array.from(e.target.selectedOptions, (o) => o.value))
-        }
-        size={Math.min(5, Math.max(2, options.length))}
-      >
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
-      <button
-        className="text-button"
-        type="button"
-        onClick={() => onChange([])}
-      >
-        Clear selection
-      </button>
-    </Field>
+    <fieldset className="multi-filter">
+      <legend>{label}</legend>
+      {label === "Positions" ? <div className="position-choices" role="group" aria-label={label}>
+        {[["", "ST", ""], ["AML", "AMC", "AMR"], ["ML", "MC", "MR"], ["WBL", "DM", "WBR"], ["DL", "DC", "DR"], ["", "GK", ""]].flatMap((line, row) =>
+          line.map((option, column) => option && options.includes(option) ? <button key={option} type="button" style={{ gridRow: row + 1, gridColumn: column + 1 }} aria-pressed={value.includes(option)} onClick={() => toggle(option)}>{option}</button> : null)
+        )}
+      </div> : <details className="multi-disclosure" ref={root} onToggle={() => { if (!root.current?.open) setQuery(""); }}>
+        <summary>{value.length ? `${value.length} selected` : "Any nationality"}</summary>
+        <div className="multi-content">
+          <input type="search" aria-label={`Find ${label.toLowerCase()}`} placeholder="Find a nationality…" value={query} onChange={event => setQuery(event.target.value)} />
+          <div className="multi-options" role="group" aria-label={label}>
+            {options.filter(option => option.toLowerCase().includes(query.trim().toLowerCase())).map(option => <label className="check" key={option}>
+              <input type="checkbox" checked={value.includes(option)} onChange={() => toggle(option)} />{option}
+            </label>)}
+            {!options.some(option => option.toLowerCase().includes(query.trim().toLowerCase())) && <p className="muted">No nationalities found.</p>}
+          </div>
+        </div>
+      </details>}
+      {value.length > 0 && <button className="text-button multi-clear" type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={() => onChange([])}>Clear selection</button>}
+    </fieldset>
   );
 }
 function Tabs({
@@ -255,8 +275,10 @@ function DataTable({
   sort,
   onSort,
   staff,
+  density,
 }: {
   staff: boolean;
+  density: Density;
   rows: Row[];
   columns: string[];
   onSelect: (r: Row) => void;
@@ -268,18 +290,70 @@ function DataTable({
   onSort: (s: { key: string; asc: boolean }) => void;
 }) {
   const [top, setTop] = useState(0);
+  const rowHeight = density === "compact" ? 28 : 34;
   const ref = useRef<HTMLDivElement>(null);
+  const pendingFocus = useRef<number | null>(null);
+  const focusedRow = useRef<number | null>(null);
   useEffect(() => {
     setTop(0);
+    pendingFocus.current = null;
+    focusedRow.current = null;
     if (ref.current) ref.current.scrollTop = 0;
-  }, [rows, columns.join(",")]);
-  const start = Math.max(0, Math.floor(top / 34) - 8),
-    end = Math.min(rows.length, start + 42);
+  }, [rows, columns.join(","), rowHeight]);
+  const start = Math.max(0, Math.floor(top / rowHeight) - 8),
+    end = Math.min(rows.length, start + Math.ceil(900 / rowHeight) + 16);
+  useEffect(() => {
+    if (pendingFocus.current === null) return;
+    const row = ref.current?.querySelector<HTMLElement>(`[data-row-index="${pendingFocus.current}"]`);
+    if (row) {
+      row.focus({ preventScroll: true });
+      pendingFocus.current = null;
+    }
+  });
+  const focusRow = (index: number) => {
+    const container = ref.current;
+    if (!container || !rows.length) return;
+    const next = Math.max(0, Math.min(rows.length - 1, index));
+    const headerHeight = container.querySelector("thead")?.getBoundingClientRect().height || 38;
+    const rowTop = headerHeight + next * rowHeight;
+    const rowBottom = rowTop + rowHeight;
+    if (rowTop < container.scrollTop + headerHeight) container.scrollTop = next * rowHeight;
+    else if (rowBottom > container.scrollTop + container.clientHeight) container.scrollTop = rowBottom - container.clientHeight;
+    focusedRow.current = next;
+    pendingFocus.current = next;
+    setTop(container.scrollTop);
+    const row = container.querySelector<HTMLElement>(`[data-row-index="${next}"]`);
+    if (row) {
+      row.focus({ preventScroll: true });
+      pendingFocus.current = null;
+    }
+  };
   return (
     <div
       className="table-scroll"
       ref={ref}
+      tabIndex={0}
+      aria-label="Scouting results"
       onScroll={(e) => setTop(e.currentTarget.scrollTop)}
+      onKeyDown={(e) => {
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !rows.length) return;
+        const target = e.target as HTMLElement;
+        const row = target.closest<HTMLElement>("[data-row-index]");
+        if (target !== e.currentTarget && (!row || target !== row)) return;
+        const current = row ? Number(row.dataset.rowIndex) : focusedRow.current;
+        const page = Math.max(1, Math.floor((e.currentTarget.clientHeight - 38) / rowHeight));
+        let next: number;
+        if (e.key === "ArrowDown" || e.key === "j") next = current === null ? 0 : current + 1;
+        else if (e.key === "ArrowUp" || e.key === "k") next = current === null ? 0 : current - 1;
+        else if (e.key === "Home") next = 0;
+        else if (e.key === "End") next = rows.length - 1;
+        else if (e.key === "PageDown") next = current === null ? 0 : current + page;
+        else if (e.key === "PageUp") next = current === null ? 0 : current - page;
+        else return;
+        e.preventDefault();
+        e.stopPropagation();
+        focusRow(next);
+      }}
     >
       <table className="results">
         <colgroup>
@@ -303,8 +377,8 @@ function DataTable({
         <thead>
           <tr>
             {compareMode && <th aria-label="Select players" />}
-            {columns.map((k) => (
-              <th key={k}>
+            {columns.map((k, columnIndex) => (
+              <th key={k} aria-sort={sort?.key === k ? (sort.asc ? "ascending" : "descending") : "none"}>
                 <button
                   title={names[k] || labels[k] || k}
                   onClick={() =>
@@ -314,6 +388,7 @@ function DataTable({
                     })
                   }
                 >
+                  {columnIndex < 9 && <span className="column-key" aria-hidden="true">{columnIndex + 1}</span>}
                   {k === "Name" && staff ? "Staff member" : labels[k] || k}
                   {sort?.key === k ? (sort.asc ? " ↑" : " ↓") : ""}
                 </button>
@@ -350,7 +425,7 @@ function DataTable({
             <tr aria-hidden="true">
               <td
                 colSpan={columns.length + (compareMode ? 1 : 0)}
-                style={{ height: start * 34, padding: 0, border: 0 }}
+                style={{ height: start * rowHeight, padding: 0, border: 0 }}
               />
             </tr>
           )}
@@ -358,11 +433,14 @@ function DataTable({
             <tr
               key={r.UID ?? start + i}
               tabIndex={0}
+              data-row-index={start + i}
+              onFocus={() => { focusedRow.current = start + i; }}
               className={selected.includes(r.UID) ? "selected" : ""}
               onClick={() => onSelect(r)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+                if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === " ") {
                   e.preventDefault();
+                  e.stopPropagation();
                   onSelect(r);
                 }
               }}
@@ -435,7 +513,7 @@ function DataTable({
               <td
                 colSpan={columns.length + (compareMode ? 1 : 0)}
                 style={{
-                  height: (rows.length - end) * 34,
+                  height: (rows.length - end) * rowHeight,
                   padding: 0,
                   border: 0,
                 }}
@@ -966,13 +1044,21 @@ function App() {
     [cmp, setCmp] = useState(false),
     [exportOpen, setExportOpen] = useState(false),
     [selected, setSelected] = useState<number[]>([]),
-    [columns, setColumns] = useSaved<string[]>("foxy-columns-v2", (() => {
-      const previous = saved<string[]>("foxy-columns", overview);
-      return previous.includes("ValueDifference") ? previous : [...previous, "ValueDifference"];
+    [columns, setColumns] = useSaved<string[]>("foxy-columns-v3", (() => {
+      const previous = saved<string[]>("foxy-columns-v2", saved<string[]>("foxy-columns", overview));
+      const next = (previous.includes("ValueDifference") ? [...previous] : [...previous, "ValueDifference"]).filter(key => key !== "Nation");
+      next.splice(next.includes("BestPos") ? next.indexOf("BestPos") + 1 : next.length, 0, "Nation");
+      return next;
     })()),
     [currency, setCurrency] = useSaved("foxy-currency", "EUR"),
     [rate, setRate] = useSaved("foxy-rate", 1.1127),
-    [night, setNight] = useSaved("foxy-night", false),
+    [appearance, setAppearance] = useSaved<Appearance>("foxy-appearance", localStorage.getItem("foxy-night") === null ? "system" : saved("foxy-night", false) ? "dark" : "light"),
+    [accent, setAccent] = useSaved<Accent>("foxy-accent", "rust"),
+    [density, setDensity] = useSaved<Density>("foxy-density", "comfortable"),
+    [motion, setMotion] = useSaved<Motion>("foxy-motion", "system"),
+    [showRatingBars, setShowRatingBars] = useSaved("foxy-rating-bars", true),
+    [showKeybindBar, setShowKeybindBar] = useSaved("foxy-keybind-bar", true),
+    [shortcutsOpen, setShortcutsOpen] = useState(false),
     [sf, setSf] = useState({
       search: "",
       age: [18, 80] as [number, number],
@@ -985,14 +1071,26 @@ function App() {
     [sfApplied, setSfApplied] = useState(sf);
   const view = views[mode],
     profile = profiles[mode];
+  const filtersPending = JSON.stringify(mode === "Staff" ? sf : draft) !== JSON.stringify(mode === "Staff" ? sfApplied : filters);
   const setView = (value: string) => setViews((v) => ({ ...v, [mode]: value }));
   const setProfile = (value: Row | null) =>
     setProfiles((v) => ({ ...v, [mode]: value }));
   const factor = currency === "EUR" ? 1 / rate : 1,
     symbol = currency === "EUR" ? "€" : "$";
   useEffect(() => {
-    document.documentElement.dataset.theme = night ? "night" : "light";
-  }, [night]);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => { document.documentElement.dataset.theme = appearance === "dark" || (appearance === "system" && media.matches) ? "night" : "light"; };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, [appearance]);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.accent = accent;
+    root.dataset.density = density;
+    root.dataset.motion = motion;
+    root.dataset.ratingBars = showRatingBars ? "visible" : "hidden";
+  }, [accent, density, motion, showRatingBars]);
   useEffect(() => {
     if (hadCurrencyPreference) return;
     invoke<{ currency?: string; usd_per_eur?: number }>("load_preferences")
@@ -1102,6 +1200,7 @@ function App() {
             "PA",
             "Diff",
             "BestPos",
+            "Nation",
             ...(group === "All attributes"
               ? Object.values(groups).flat()
               : [
@@ -1109,6 +1208,93 @@ function App() {
                   ...groups[group],
                 ]),
           ];
+  const configuration: SearchConfiguration = mode === "Staff"
+    ? { mode: "Staff", filters: sf, sort, group: staffGroup, currency, rate }
+    : { mode: "Players", filters: draft, sort, group, columns, currency, rate };
+  const profileIndex = profile ? rows.findIndex(row => row.UID === profile.UID) : -1;
+  function browseProfile(direction: number) {
+    const next = rows[profileIndex + direction];
+    if (view === "profile" && profileIndex >= 0 && next) setProfile(next);
+  }
+  function focusSearch() {
+    const input = document.querySelector<HTMLInputElement>('aside input[data-scout-search]');
+    if (input) { input.closest("details")?.setAttribute("open", ""); input.focus(); input.select(); }
+  }
+  function focusResults() {
+    const table = document.querySelector<HTMLElement>('.table-scroll');
+    table?.focus();
+    table?.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+  }
+  function saveSearch() {
+    const panel = document.querySelector<HTMLDetailsElement>('.saved-searches');
+    if (panel) { panel.open = true; panel.querySelector<HTMLInputElement>('input')?.focus(); }
+  }
+  function restoreSearch(config: SearchConfiguration) {
+    setCurrency(config.currency); setRate(config.rate); setSort(config.sort);
+    if (config.mode === "Players") {
+      setDraft(config.filters); setFilters(config.filters); setColumns(config.columns);
+      setGroup(["Overview", "All attributes", ...Object.keys(groups)].includes(config.group) ? config.group : "Overview");
+      setSelected([]);
+    } else {
+      setSf(config.filters); setSfApplied(config.filters);
+      setStaffGroup(["Overview", ...Object.keys(staffGroups)].includes(config.group) ? config.group : "Overview");
+    }
+    setView("list");
+  }
+  function sortColumn(index: number, ascending = false) {
+    const key = shown[index];
+    if (!key) return;
+    const numeric = rows.some(row => typeof row[key] === "number");
+    setSort(current => ({ key, asc: ascending || (current?.key === key ? !current.asc : !numeric) }));
+  }
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || document.querySelector('dialog[open], .header-panel, .column-picker[open], .multi-disclosure[open]')) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const editing = !!target?.closest('input, select, textarea, [contenteditable="true"], [role="textbox"]');
+      const command = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      if (event.key === "Enter" && !command && !event.altKey && !event.shiftKey && view === "list"
+        && !target?.closest('button, summary, a, select, input[type="checkbox"], .saved-searches')
+        && (!editing || target?.closest('aside form'))) {
+        event.preventDefault();
+        document.querySelector<HTMLFormElement>('aside form')?.requestSubmit();
+        return;
+      }
+      if (command && !event.altKey && !event.shiftKey && view === "list" && (key === "f" || key === "s" || key === "enter")) {
+        event.preventDefault();
+        if (key === "f") focusSearch();
+        else if (key === "s") saveSearch();
+        else document.querySelector<HTMLFormElement>('aside form')?.requestSubmit();
+        return;
+      }
+      if (editing || command) {
+        if (target?.matches('input[data-scout-search]') && event.key === "ArrowDown" && !event.altKey && !command && view === "list" && rows.length) {
+          event.preventDefault(); focusResults();
+        }
+        return;
+      }
+      if (event.altKey) {
+        if (/^Digit[1-9]$/.test(event.code) && view === "list") { event.preventDefault(); sortColumn(Number(event.code.slice(-1)) - 1, event.shiftKey); }
+        else if (event.code === "Digit0" && view === "list") {
+          event.preventDefault();
+          const current = sort || { key: mode === "Staff" ? sfApplied.sort : filters.sort, asc: ["Name", "Age"].includes(mode === "Staff" ? sfApplied.sort : filters.sort) };
+          setSort({ ...current, asc: !current.asc });
+        }
+        else if (event.code === "KeyP" || event.code === "KeyS") { event.preventDefault(); const next = event.code === "KeyP" ? "Players" : "Staff"; setMode(next); setViews(value => ({ ...value, [next]: "list" })); setSort(null); }
+        else if (event.code === "KeyE" && view === "list" && snapshot && rows.length) { event.preventDefault(); setExportOpen(true); }
+        else if (event.code === "KeyC" && mode === "Players" && view === "list") { event.preventDefault(); setCmp(value => !value); setSelected([]); }
+        else if (event.key === "Enter" && mode === "Players" && cmp && selected.length >= 2) { event.preventDefault(); setView("compare"); }
+        else if (event.key === "ArrowLeft" || event.key === "ArrowRight") { if (view === "profile") { event.preventDefault(); browseProfile(event.key === "ArrowLeft" ? -1 : 1); } }
+        return;
+      }
+      if (event.key === "/" && view === "list") { event.preventDefault(); focusSearch(); }
+      else if (event.key === "?") { event.preventDefault(); setShortcutsOpen(true); }
+      else if (event.key === "Escape" && view !== "list") { event.preventDefault(); setView("list"); }
+    };
+    document.addEventListener("keydown", shortcut);
+    return () => document.removeEventListener("keydown", shortcut);
+  }, [view, mode, shown.join(","), rows, sort, profileIndex, filters.sort, sfApplied.sort, cmp, selected, snapshot]);
   const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
   async function load() {
@@ -1243,6 +1429,8 @@ function App() {
             </button>
           </div>
         </details>
+        {view === "list" && <SavedSearches key={mode} mode={mode === "Staff" ? "Staff" : "Players"} configuration={configuration}
+          disabled={(mode === "Staff" ? sf : draft).columnRules.some(rule => !!ruleError(rule))} onLoad={restoreSearch} />}
         {view === "list" && mode === "Players" && (
           <form
             onSubmit={(e) => {
@@ -1259,6 +1447,9 @@ function App() {
               <div className="details-content">
                 <Field label="Search players">
                   <input
+                    data-scout-search
+                    type="search"
+                    title="Find players · ⌘F / Ctrl+F"
                     placeholder="Search any column…"
                     value={draft.search}
                     onChange={(e) => setFilter("search", e.target.value)}
@@ -1408,6 +1599,7 @@ function App() {
             <button className="primary" type="submit" disabled={draft.columnRules.some(rule => !!ruleError(rule))}>
               Apply filters
             </button>
+            <p className="filter-state" role="status">{filtersPending ? "Changes ready to apply" : "Filters are up to date"}<span>Enter to apply</span></p>
             <button
               type="button"
               className="text-button"
@@ -1433,6 +1625,9 @@ function App() {
             <h2 className="sidebar-title">Staff filters</h2>
             <Field label="Search staff">
               <input
+                data-scout-search
+                type="search"
+                title="Find staff · ⌘F / Ctrl+F"
                 value={sf.search}
                 placeholder="Search any column…"
                 onChange={(e) => setSf({ ...sf, search: e.target.value })}
@@ -1490,7 +1685,8 @@ function App() {
               </select>
             </Field>
             <ColumnFilters columns={searchableColumns} rules={sf.columnRules} onChange={v => setSf({ ...sf, columnRules: v })} currency={currency}/>
-            <button className="primary" disabled={sf.columnRules.some(rule => !!ruleError(rule))}>Apply staff filters</button>
+            <button className="primary" type="submit" disabled={sf.columnRules.some(rule => !!ruleError(rule))}>Apply staff filters</button>
+            <p className="filter-state" role="status">{filtersPending ? "Changes ready to apply" : "Filters are up to date"}<span>Enter to apply</span></p>
             <button type="button" className="text-button" onClick={() => {
               const reset = { search: "", age: [18, 80] as [number, number], nations: [] as string[], attr: "Attacking", min: 1, sort: "CA", columnRules: [] as ColumnRule[] };
               setSf(reset); setSfApplied(reset); setSort(null);
@@ -1499,36 +1695,14 @@ function App() {
         )}
       </aside>
       <main>
-        <AppHeader onAbout={() => setView("about")} onQuit={() => invoke("quit_app").catch(e => setError(String(e)))} settings={<>
-            <Field label="Currency">
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-              >
-                <option value="EUR">Euro (€)</option>
-                <option value="USD">US dollar ($)</option>
-              </select>
-            </Field>
-            <Field label="USD per €1">
-              <input
-                type="number"
-                min="0.0001"
-                step="0.0001"
-                value={rate}
-                onChange={(e) => {
-                  if (+e.target.value > 0) setRate(+e.target.value);
-                }}
-              />
-            </Field>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={night}
-                onChange={(e) => setNight(e.target.checked)}
-              />{" "}
-              Night theme
-            </label>
-        </>}/>
+        <AppHeader onAbout={() => setView("about")} onQuit={() => invoke("quit_app").catch(e => setError(String(e)))} settings={
+          <Preferences appearance={appearance} accent={accent} density={density} motion={motion} showRatingBars={showRatingBars} currency={currency} rate={rate}
+            showKeybindBar={showKeybindBar} onShowKeybindBarChange={setShowKeybindBar} onShowShortcuts={() => setShortcutsOpen(true)}
+            onAppearanceChange={setAppearance} onAccentChange={setAccent} onDensityChange={setDensity} onMotionChange={setMotion} onShowRatingBarsChange={setShowRatingBars}
+            onCurrencyChange={setCurrency} onRateChange={setRate} onReset={() => {
+              setAppearance("system"); setAccent("rust"); setDensity("comfortable"); setMotion("system"); setShowRatingBars(true); setShowKeybindBar(true); setCurrency("EUR"); setRate(1.1127);
+            }} />
+        }/>
         {error && (
           <div className="error" role="alert">
             {error}
@@ -1734,38 +1908,18 @@ function App() {
             )}
             <>
                 <div className="results-controls">
-                  <span>
-                    {rows.length.toLocaleString()} {mode.toLowerCase()}
+                  <span className="result-count" aria-live="polite">
+                    <strong>{rows.length.toLocaleString()}</strong> {mode.toLowerCase()}
+                    <span className="result-context">of {(mode === "Staff" ? staff : players).length.toLocaleString()} loaded</span>
+                    {filtersPending && <span className="pending-label">Unapplied changes</span>}
                   </span>
                   {mode === "Players" && group === "Overview" && (
-                    <details className="column-picker">
-                      <summary>Customize columns</summary>
-                      <div>
-                        {extras.map((c) => (
-                          <label className="check" key={c}>
-                            <input
-                              type="checkbox"
-                              checked={columns.includes(c)}
-                              onChange={(e) =>
-                                setColumns(
-                                  e.target.checked
-                                    ? [...columns, c]
-                                    : columns.filter((k) => k !== c),
-                                )
-                              }
-                            />
-                            {labels[c] || c}
-                          </label>
-                        ))}
-                        <button onClick={() => setColumns(overview)}>
-                          Restore default
-                        </button>
-                      </div>
-                    </details>
+                    <ColumnPicker available={[...new Set([...extras, ...searchableColumns.map(c => c.key)])].filter(c => c !== "Name")} value={columns} defaults={overview} onChange={setColumns} />
                   )}
                 </div>
                 <DataTable
                   rows={rows}
+                  density={density}
                   staff={mode === "Staff"}
                   columns={shown}
                   onSelect={select}
@@ -1780,6 +1934,11 @@ function App() {
           </>
         )}
       </main>
+      {showKeybindBar && snapshot && view !== "about" && <KeybindBar profile={view !== "list"}
+        onSearch={focusSearch} onApply={() => document.querySelector<HTMLFormElement>('aside form')?.requestSubmit()} onResults={focusResults} onSave={saveSearch} onHelp={() => setShortcutsOpen(true)}
+        onBack={() => setView("list")} onPrevious={() => browseProfile(-1)} onNext={() => browseProfile(1)}
+        hasPrevious={view === "profile" && profileIndex > 0} hasNext={view === "profile" && profileIndex >= 0 && profileIndex < rows.length - 1} />}
+      {shortcutsOpen && <ShortcutGuide columns={shown} onClose={() => setShortcutsOpen(false)} />}
       {exportOpen && (
         <ExportDialog
           rows={rows} columns={shown} mode={mode}

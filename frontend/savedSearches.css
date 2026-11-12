@@ -1,0 +1,13 @@
+.saved-searches { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 13px; }
+.saved-searches > summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.saved-searches-content { display: grid; gap: 8px; padding-top: 12px; }
+.saved-searches-content > label { font-size: 11px; color: var(--muted); }
+.saved-searches-content .filter-hint { margin: 0 0 3px; }
+.saved-search-name { display: flex; align-items: center; gap: 6px; }
+.saved-search-name input { min-width: 0; }
+.saved-search-name button { flex: 0 0 auto; }
+.saved-searches-content button, .saved-searches-content select, .saved-searches-content input { font-size: 12px; }
+.saved-search-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.saved-search-actions button { padding: 6px; }
+.saved-search-status { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.saved-search-status:empty { display: none; }

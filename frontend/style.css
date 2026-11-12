@@ -4,31 +4,31 @@
   color: #171717;
   background: #fff;
   font-synthesis: none;
-  --bg: #fff;
-  --surface: #f6f6f4;
-  --ink: #171717;
-  --muted: #62625e;
-  --line: #deded9;
-  --accent: #b7470e;
-  --track: #efefeb;
-  --selection: #f7dfcf;
+  --bg: #fdfdfb;
+  --surface: #f3f3ef;
+  --ink: #242722;
+  --muted: #666960;
+  --line: #d8dcd2;
+  --accent: #a64017;
+  --track: #ebeee6;
+  --selection: #f5e4d8;
   --blue: #596873;
   color-scheme: light;
   font-variant-numeric: tabular-nums;
 }
 :root[data-theme="night"] {
-  --bg: #242424;
-  --surface: #2c2c2c;
-  --ink: #fff;
-  --muted: #bcbcbc;
-  --line: #444;
+  --bg: #20231f;
+  --surface: #272b25;
+  --ink: #eef0e9;
+  --muted: #afb7a9;
+  --line: #43493e;
   --accent: #ff944d;
-  --track: #393939;
-  --selection: #503c2d;
+  --track: #32382e;
+  --selection: #4e3829;
   --blue: #a3b0bb;
   color-scheme: dark;
-  background: #242424;
-  color: #fff;
+  background: var(--bg);
+  color: var(--ink);
 }
 * {
   box-sizing: border-box;
@@ -49,7 +49,7 @@ button,
 input,
 select {
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--bg);
   min-height: 34px;
 }
@@ -137,8 +137,8 @@ header > div {
   display: flex;
   gap: 9px;
   align-items: center;
-  font-size: 21px;
-  margin-bottom: 20px;
+  font-size: 20px;
+  margin-bottom: 24px;
   letter-spacing: -0.025em;
 }
 .sidebar-brand img {
@@ -194,9 +194,25 @@ legend {
   font-weight: 500;
   color: var(--muted);
 }
-select[multiple] {
-  min-height: 65px;
-}
+.multi-filter { min-width: 0; margin: 0; padding: 0; border: 0; }
+.multi-filter > legend { padding: 0; margin-bottom: 7px; }
+form > .multi-filter { margin: 12px 0; }
+.position-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(6, auto); gap: 5px; }
+.position-choices button { min-height: 32px; padding: 5px 0; font-size: 12px; font-weight: 550; background: transparent; }
+.position-choices button[aria-pressed="true"] { color: var(--accent); background: var(--selection); border-color: var(--accent); }
+.multi-clear { margin-top: 5px; }
+aside details.multi-disclosure { padding: 0; border: 0; }
+.multi-disclosure > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; min-height: 34px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 400; list-style: none; }
+.multi-disclosure > summary::-webkit-details-marker { display: none; }
+.multi-disclosure > summary::after { content: ""; width: 6px; height: 6px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); margin-right: 2px; margin-top: -3px; }
+.multi-disclosure[open] > summary::after { transform: rotate(225deg); margin-top: 3px; }
+.multi-disclosure[open] > summary { color: var(--ink); }
+.multi-content { padding-top: 8px; }
+.multi-options { max-height: 180px; margin-top: 5px; overflow-y: auto; overscroll-behavior: contain; }
+.multi-options .check { padding: 4px 5px; border-radius: 4px; font-size: 12px; }
+.multi-options .check:hover { background: var(--track); }
+.multi-options input { flex-shrink: 0; }
+.multi-options p { font-size: 12px; margin: 8px 0; }
 .range {
   padding: 0;
   border: 0;
@@ -264,8 +280,10 @@ form > .primary {
   margin-top: 8px;
 }
 .sidebar-title {
-  font-size: 13px;
-  margin: 25px 0 11px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 550;
+  margin: 26px 0 12px;
 }
 aside .settings {
   margin-top: 25px;
@@ -277,7 +295,7 @@ aside .settings {
   justify-content: space-between;
 }
 h1 {
-  font-size: 25px;
+  font-size: 27px;
   font-weight: 650;
   letter-spacing: -0.025em;
   margin: 0;
@@ -321,7 +339,10 @@ p {
   align-items: center;
   gap: 17px;
   flex-wrap: wrap;
-  margin: 22px 0 16px;
+  margin: 20px 0 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .toolbar > .field {
   flex-direction: row;
@@ -355,7 +376,7 @@ p {
 .column-picker summary {
   font-weight: 500;
 }
-.column-picker > div {
+.column-picker > .column-panel {
   position: absolute;
   z-index: 8;
   right: 0;
@@ -366,14 +387,15 @@ p {
   border-radius: 8px;
   padding: 14px;
   width: 330px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .table-scroll {
-  height: 720px;
+  height: clamp(360px, calc(100vh - 300px), 900px);
   overflow: auto;
   border: 1px solid var(--line);
+  border-radius: 6px;
   position: relative;
   background: var(--bg);
 }
@@ -509,7 +531,7 @@ table.results {
 .score-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: var(--selection);
+  background: color-mix(in srgb, var(--ink) 10%, var(--track));
 }
 .score-fill.risk {
   background: var(--line);
@@ -992,10 +1014,22 @@ dd {
     width: 290px;
   }
   .table-scroll {
-    height: 620px;
+    height: 65vh;
+    min-height: 320px;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  button, .multi-disclosure > summary, .column-picker summary, .multi-options .check {
+    transition: background-color 110ms ease-out, border-color 110ms ease-out, color 110ms ease-out;
+  }
+  .multi-disclosure > summary::after { transition: transform 120ms ease-out; }
+  .multi-disclosure[open] .multi-content, .column-picker[open] .column-panel, .header-panel, .export-dialog[open] {
+    animation: control-reveal 140ms cubic-bezier(.16, 1, .3, 1);
+  }
+  @keyframes control-reveal {
+    from { opacity: .5; clip-path: inset(0 0 8px 0); }
+    to { opacity: 1; clip-path: inset(0); }
+  }
   .loading progress {
     animation: loading-in 200ms ease-out;
   }
@@ -1096,3 +1130,39 @@ dd {
 :root[data-theme="night"] .sheet .attribute-group dd.attribute-tone-medium { color: #f2eb16; }
 :root[data-theme="night"] .sheet .attribute-group dd.attribute-tone-good { color: #b4e530; }
 :root[data-theme="night"] .sheet .attribute-group dd.attribute-tone-high { color: #35eb27; }
+
+/* Quiet, task-focused refinements shared by the scouting workspaces. */
+input::placeholder { color: var(--muted); opacity: 1; }
+button:active:not(:disabled) { background: var(--selection); }
+.primary:active:not(:disabled) { background: var(--accent); filter: brightness(.85); }
+aside > .tabs { padding: 3px; border: 1px solid var(--line); border-radius: 8px; gap: 4px; }
+aside > .tabs button { flex: 1; }
+aside > .tabs .active { box-shadow: 0 1px 2px #00000008; }
+.filter-state { margin: 9px 0 7px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+.filter-state span { display: block; font-size: 10px; }
+.result-count { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.result-count strong { color: var(--ink); font-size: 13px; font-weight: 650; }
+.result-context { margin-left: 5px; }
+.pending-label { color: var(--accent); margin-left: 9px; font-size: 11px; }
+.results th[aria-sort="ascending"], .results th[aria-sort="descending"] { box-shadow: inset 0 -2px var(--accent); }
+.results th[aria-sort="ascending"] button, .results th[aria-sort="descending"] button { color: var(--accent); }
+.results tbody tr:focus-visible { outline-offset: -2px; }
+.table-scroll[aria-label="Scouting results"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.results tbody tr.selected:hover td { background: var(--selection); }
+.column-panel-heading { display: flex; justify-content: space-between; align-items: center; }
+.column-panel-heading strong { color: var(--ink); font-size: 13px; }
+.column-options { max-height: min(360px, 45vh); overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 3px; }
+.column-options .check { padding: 4px; color: var(--ink); font-size: 12px; }
+.column-options .check:hover { background: var(--surface); border-radius: 4px; }
+.column-options .check input { flex-shrink: 0; }
+.column-picker summary { padding: 5px 8px; border-radius: 5px; }
+.column-picker summary:hover, .column-picker[open] summary { background: var(--surface); color: var(--ink); }
+.export-actions button[type="submit"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.about-intro, .about-card p { max-width: 72ch; }
+@media (max-width: 650px) {
+  .results-controls { align-items: flex-start; gap: 8px; }
+  .column-picker { flex-shrink: 0; }
+  .result-context { margin-left: 0; }
+  .pending-label { margin-left: 0; flex-basis: 100%; }
+  .header-panel { width: min(280px, calc(100vw - 30px)); }
+}

@@ -155,6 +155,7 @@ export const names: Record<string, string> = {
 export const labels: Record<string, string> = {
   Name: "Player",
   BestPos: "Position",
+  Nation: "Country",
   Diff: "PA − CA",
   RoleRtg: "Role /100",
   PotRtg: "Potential /100",
@@ -200,6 +201,7 @@ export const overview = [
   "PA",
   "Diff",
   "BestPos",
+  "Nation",
   "MarketValue",
   "SaleValue",
   "ValueDifference",
