@@ -255,6 +255,8 @@ export type Filters = {
   basis: string;
   scenario: string;
   contract: string;
+  contractFrom?: string;
+  contractTo?: string;
   listing: string;
   columnRules: ColumnRule[];
   sort: string;
@@ -274,6 +276,8 @@ export const defaults: Filters = {
   basis: "MarketValue",
   scenario: "Any club",
   contract: "All",
+  contractFrom: "",
+  contractTo: "",
   listing: "All",
   columnRules: [],
   sort: "CA",
@@ -336,6 +340,12 @@ export function filterPlayers(
         return false;
       if (f.max && (price == null || price > (f.max * 1e6) / factor))
         return false;
+      if (f.contractFrom || f.contractTo) {
+        const end = contractDate(r.Contract);
+        if (end == null) return false;
+        if (f.contractFrom && !(end >= Date.parse(f.contractFrom))) return false;
+        if (f.contractTo && !(end <= Date.parse(f.contractTo))) return false;
+      }
       if (f.contract !== "All") {
         const end = contractDate(r.Contract);
         if (end == null) return false;

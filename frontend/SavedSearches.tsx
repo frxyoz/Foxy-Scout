@@ -47,9 +47,10 @@ function parseConfiguration(value: unknown): SearchConfiguration | null {
   if (!isText(f.club) || !isRange(f.ca) || !isRange(f.pa) || !isRange(f.rating) || !isRange(f.potential)
     || !isTexts(f.positions) || !isNumber(f.max) || !isText(f.basis) || !isText(f.scenario)
     || !isText(f.contract) || !isText(f.listing) || !isTexts(value.columns)) return null;
+  if ((f.contractFrom !== undefined && !isText(f.contractFrom)) || (f.contractTo !== undefined && !isText(f.contractTo))) return null;
   return { ...common, mode: "Players", columns: [...value.columns], filters: {
     ...shared, club: f.club, ca: [...f.ca], pa: [...f.pa], rating: [...f.rating], potential: [...f.potential],
-    positions: [...f.positions], max: f.max, basis: f.basis, scenario: f.scenario, contract: f.contract, listing: f.listing,
+    positions: [...f.positions], max: f.max, basis: f.basis, scenario: f.scenario, contract: f.contract, contractFrom: f.contractFrom || "", contractTo: f.contractTo || "", listing: f.listing,
   } };
 }
 

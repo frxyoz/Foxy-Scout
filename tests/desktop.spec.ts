@@ -443,3 +443,30 @@ test('top-right settings, About and app actions work without losing the current 
  await page.getByRole('button',{name:'Quit Foxy Scout',exact:true}).click();
  expect(await page.evaluate(()=>(window as any).__quitCalled)).toBe(true);
 });
+
+test('contract expiry has its own section above searchable column filters',async({page})=>{
+ const data=structuredClone(fixture);
+ data.players[0].Contract='30/06/2027';
+ data.players[1].Contract='30/06/2028';
+ await setup(page,data);
+ const contract=page.locator('aside details').filter({has:page.locator('summary').getByText('Contract expiry',{exact:true})});
+ await expect(contract).toHaveCount(1);
+ const columnFilters=page.locator('aside .column-filters');
+ expect(await contract.evaluate((el)=>!!el.nextElementSibling?.classList.contains('column-filters'))).toBe(true);
+ await contract.locator('summary').click();
+ await page.getByLabel('Expires on or after',{exact:true}).fill('2027-06-01');
+ await page.getByLabel('Expires on or before',{exact:true}).fill('2027-06-30');
+ await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+ await expect(page.locator('.results tbody tr[aria-label]')).toHaveCount(1);
+ await expect(page.getByRole('row',{name:'Open '+data.players[0].Name,exact:true})).toBeVisible();
+ await columnFilters.locator('summary').click();
+ await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
+ await page.getByLabel('Find column for condition 1',{exact:true}).fill('consistency');
+ await expect(page.getByLabel('Condition 1 column',{exact:true}).locator('option')).toHaveCount(2);
+ await page.getByLabel('Condition 1 column',{exact:true}).selectOption('Consis');
+ await expect(page.getByLabel('Condition 1 column',{exact:true})).toHaveValue('Consis');
+ await page.getByLabel('Find column for condition 1',{exact:true}).fill('no-such-attribute');
+ await expect(page.getByText('No columns match your search.',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('Condition 1 column',{exact:true})).toHaveValue('Consis');
+ await page.screenshot({path:'test-results/contract-column-search.png',fullPage:true});
+});

@@ -1543,21 +1543,6 @@ function App() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Contract status">
-                  <select
-                    value={draft.contract}
-                    onChange={(e) => setFilter("contract", e.target.value)}
-                  >
-                    {[
-                      "All",
-                      "Expired",
-                      "Expiring in 6 months",
-                      "Expiring in 12 months",
-                    ].map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </Field>
                 <Field label="Listing status">
                   <select value={draft.listing} onChange={(e) => setFilter("listing", e.target.value)}>
                     <option value="All">All players</option>
@@ -1595,6 +1580,27 @@ function App() {
                 ))}
               </select>
             </Field>
+            <details open={draft.contract !== "All" || !!draft.contractFrom || !!draft.contractTo || undefined}>
+              <summary>Contract expiry</summary>
+              <div className="details-content">
+                <p className="filter-hint">Find players by when their contract ends. Time windows use the save’s game date.</p>
+                <Field label="Expiry window">
+                  <select value={draft.contract} onChange={e => {
+                    setDraft({ ...draft, contract: e.target.value, contractFrom: "", contractTo: "" });
+                  }}>
+                    {["All", "Expired", "Expiring in 6 months", "Expiring in 12 months"].map(x => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
+                <Field label="Expires on or after">
+                  <input type="date" value={draft.contractFrom || ""} max={draft.contractTo || undefined}
+                    onChange={e => setDraft({ ...draft, contract: "All", contractFrom: e.target.value })} />
+                </Field>
+                <Field label="Expires on or before">
+                  <input type="date" value={draft.contractTo || ""} min={draft.contractFrom || undefined}
+                    onChange={e => setDraft({ ...draft, contract: "All", contractTo: e.target.value })} />
+                </Field>
+              </div>
+            </details>
             <ColumnFilters columns={searchableColumns} rules={draft.columnRules} onChange={v => setFilter("columnRules", v)} currency={currency}/>
             <button className="primary" type="submit" disabled={draft.columnRules.some(rule => !!ruleError(rule))}>
               Apply filters

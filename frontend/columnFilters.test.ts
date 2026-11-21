@@ -41,3 +41,14 @@ describe("column search", () => {
     expect(input[0].SaleValue).toBe(2000000);
   });
 });
+
+describe("contract expiry range", () => {
+  it("matches inclusive expiry dates and excludes unknown and free contracts", () => {
+    const base = { Age: 20, CA: 120, PA: 150 };
+    const rows = ["31/05/2027", "01/06/2027", "30/06/2027", "01/07/2027", "Free", null].map(Contract => ({ ...base, Contract }));
+    const filters = { ...defaults, contractFrom: "2027-06-01", contractTo: "2027-06-30" };
+    expect(filterPlayers(rows, filters, "2026-11-11", 1).map(r => r.Contract)).toEqual(["01/06/2027", "30/06/2027"]);
+    expect(filterPlayers(rows, { ...filters, contractFrom: "" }, "2026-11-11", 1)).toHaveLength(3);
+    expect(filterPlayers(rows, { ...filters, contractTo: "" }, "2026-11-11", 1)).toHaveLength(3);
+  });
+});

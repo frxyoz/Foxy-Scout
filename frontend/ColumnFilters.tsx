@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ColumnRule, SearchColumn, ruleError, isMoney } from "./data";
 
 const textOperators = [["contains", "contains"], ["not_contains", "does not contain"], ["eq", "equals"], ["ne", "does not equal"], ["starts", "starts with"], ["ends", "ends with"]];
@@ -8,6 +9,27 @@ export function operatorsFor(column?: SearchColumn) {
     : column?.kind === "date" ? [["before", "before"], ["after", "after"], ...textOperators] : textOperators;
   return [...operators, ["empty", "is missing"], ["present", "is available"]];
 }
+function SearchableColumn({ columns, value, index, onChange }: {
+  columns: SearchColumn[]; value: string; index: number; onChange: (key: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const terms = query.trim().toLowerCase().split(/\s+/);
+  const matches = columns.filter(column => terms.every(term => `${column.label} ${column.key}`.toLowerCase().includes(term)));
+  const options = columns.filter(column => column.key === value || matches.includes(column));
+  return <>
+    <label>Find a column
+      <input type="search" aria-label={`Find column for condition ${index + 1}`} placeholder="Type an attribute or column name…"
+        value={query} onChange={e => setQuery(e.target.value)} />
+    </label>
+    <label>Column
+      <select aria-label={`Condition ${index + 1} column`} value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(column => <option value={column.key} key={column.key}>{column.label}</option>)}
+      </select>
+    </label>
+    {query.trim() && <p className="filter-hint" role="status">{matches.length ? `${matches.length} matching columns` : "No columns match your search."}</p>}
+  </>;
+}
+
 export function ColumnFilters({ columns, rules, onChange, currency }: {
   columns: SearchColumn[]; rules: ColumnRule[]; onChange: (rules: ColumnRule[]) => void; currency: string;
 }) {
@@ -22,14 +44,10 @@ export function ColumnFilters({ columns, rules, onChange, currency }: {
         const needsValue = !["empty", "present"].includes(rule.operator);
         return <fieldset className="column-rule" key={index}>
           <legend>Condition {index + 1}</legend>
-          <label>Column
-            <select aria-label={`Condition ${index + 1} column`} value={rule.column} onChange={e => {
-              const next = columns.find(column => column.key === e.target.value);
-              update(index, { column: e.target.value, operator: operatorsFor(next)[0][0], value: next?.kind === "boolean" ? "true" : "" });
-            }}>
-              {columns.map(column => <option value={column.key} key={column.key}>{column.label}</option>)}
-            </select>
-          </label>
+          <SearchableColumn columns={columns} value={rule.column} index={index} onChange={key => {
+            const next = columns.find(column => column.key === key);
+            update(index, { column: key, operator: operatorsFor(next)[0][0], value: next?.kind === "boolean" ? "true" : "" });
+          }} />
           <label>Match
             <select aria-label={`Condition ${index + 1} operator`} value={rule.operator} onChange={e => update(index, { operator: e.target.value })}>
               {operatorsFor(column).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
