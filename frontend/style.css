@@ -9,6 +9,7 @@
   --ink: #242722;
   --muted: #666960;
   --line: #d8dcd2;
+  --control-line: #858a7e;
   --accent: #a64017;
   --track: #ebeee6;
   --selection: #f5e4d8;
@@ -22,6 +23,7 @@
   --ink: #eef0e9;
   --muted: #afb7a9;
   --line: #43493e;
+  --control-line: #7c8575;
   --accent: #ff944d;
   --track: #32382e;
   --selection: #4e3829;
@@ -1166,3 +1168,41 @@ aside > .tabs .active { box-shadow: 0 1px 2px #00000008; }
   .pending-label { margin-left: 0; flex-basis: 100%; }
   .header-panel { width: min(280px, calc(100vw - 30px)); }
 }
+
+/* Keep filter actions within reach while the open sections scroll. */
+aside form { position: relative; }
+aside { scroll-padding-block: 16px 112px; }
+.filter-actions {
+  position: sticky;
+  bottom: -21px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 6px;
+  margin: 12px -18px -21px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.filter-actions > .primary { width: 100%; font-size: 12px; }
+.filter-actions > .text-button { grid-column: 2; grid-row: 1; padding-inline: 5px; font-size: 11px; }
+.filter-actions > .filter-state { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: space-between; gap: 8px; margin: 0; }
+.filter-actions > .filter-state span { flex-shrink: 0; align-self: center; }
+aside form > details > summary:hover { color: var(--accent); }
+@media (max-width: 650px) {
+  aside form { scroll-padding-bottom: 96px; }
+  .filter-actions { bottom: 0; margin: 12px 0 0; padding: 10px 0; }
+}
+
+/* Native-sized touch controls on touchscreens; keep mouse layouts compact. */
+@media (pointer: coarse) {
+  aside :is(button, input:not([type="checkbox"]), select, summary),
+  aside .multi-options .check { min-height: 44px; }
+  aside .filter-actions > .text-button { min-width: 44px; }
+}
+
+/* Form boundaries remain visible independently of subtle section dividers. */
+aside input:not([type="checkbox"]),
+aside select,
+aside .multi-disclosure > summary { border-color: var(--control-line); }

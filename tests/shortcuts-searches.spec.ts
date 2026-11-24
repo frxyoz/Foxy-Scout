@@ -235,7 +235,7 @@ test('saved searches restore table layout and sort, and support update rename de
  await expect(page.getByLabel('Currency',{exact:true})).toHaveValue('USD');
  await expect(page.getByLabel('USD per €1',{exact:true})).toHaveValue('1.4');
  await page.keyboard.press('Escape');
- await page.getByText('Column filters',{exact:true}).click();
+ await expect(page.locator('.column-filters')).toHaveAttribute('open','');
  await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
  await expect(panel.getByRole('button',{name:'Update search',exact:true})).toBeDisabled();
  await panel.getByLabel('Search name',{exact:true}).fill('Invalid');
@@ -247,6 +247,7 @@ test('saved searches restore table layout and sort, and support update rename de
 test('choosing a saved search immediately restores its filters and results',async({page})=>{
  await setup(page);
  await expect(saved(page)).toHaveAttribute('open','');
+ await expect(page.getByRole('button',{name:'Apply filters',exact:true})).toBeInViewport();
  await page.getByLabel('Search players',{exact:true}).fill('Alex');
  const panel=await openSaved(page);
  await panel.getByLabel('Search name',{exact:true}).fill('Young shortlist');

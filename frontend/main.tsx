@@ -1455,6 +1455,14 @@ function App() {
                     onChange={(e) => setFilter("search", e.target.value)}
                   />
                 </Field>
+                <Field label="Current club (contains)">
+                  <input
+                    type="search"
+                    placeholder="Club name…"
+                    value={draft.club}
+                    onChange={(e) => setFilter("club", e.target.value)}
+                  />
+                </Field>
                 <Range
                   label="Player age"
                   value={draft.age}
@@ -1468,11 +1476,6 @@ function App() {
                   value={draft.positions}
                   onChange={(v) => setFilter("positions", v)}
                 />
-              </div>
-            </details>
-            <details>
-              <summary>Ability</summary>
-              <div className="details-content">
                 {(["ca", "pa", "rating", "potential"] as const).map((k, i) => (
                   <Range
                     key={k}
@@ -1492,16 +1495,9 @@ function App() {
                 ))}
               </div>
             </details>
-            <details>
+            <details open>
               <summary>Market</summary>
               <div className="details-content">
-                <Field label="Club">
-                  <input
-                    value={draft.club}
-                    placeholder="Any club"
-                    onChange={(e) => setFilter("club", e.target.value)}
-                  />
-                </Field>
                 <Multi
                   label="Nationalities"
                   options={nations}
@@ -1580,7 +1576,7 @@ function App() {
                 ))}
               </select>
             </Field>
-            <details open={draft.contract !== "All" || !!draft.contractFrom || !!draft.contractTo || undefined}>
+            <details open>
               <summary>Contract expiry</summary>
               <div className="details-content">
                 <p className="filter-hint">Find players by when their contract ends. Time windows use the save’s game date.</p>
@@ -1602,21 +1598,23 @@ function App() {
               </div>
             </details>
             <ColumnFilters columns={searchableColumns} rules={draft.columnRules} onChange={v => setFilter("columnRules", v)} currency={currency}/>
-            <button className="primary" type="submit" disabled={draft.columnRules.some(rule => !!ruleError(rule))}>
-              Apply filters
-            </button>
-            <p className="filter-state" role="status">{filtersPending ? "Changes ready to apply" : "Filters are up to date"}<span>Enter to apply</span></p>
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => {
-                setDraft(defaults);
-                setFilters(defaults);
-                setSort(null);
-              }}
-            >
-              Reset filters
-            </button>
+            <div className="filter-actions">
+              <button className="primary" type="submit" disabled={draft.columnRules.some(rule => !!ruleError(rule))}>
+                Apply filters
+              </button>
+              <p className="filter-state" role="status">{filtersPending ? "Changes ready to apply" : "Filters are up to date"}<span>Enter to apply</span></p>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setDraft(defaults);
+                  setFilters(defaults);
+                  setSort(null);
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
           </form>
         )}
         {view === "list" && mode === "Staff" && (
@@ -1691,12 +1689,14 @@ function App() {
               </select>
             </Field>
             <ColumnFilters columns={searchableColumns} rules={sf.columnRules} onChange={v => setSf({ ...sf, columnRules: v })} currency={currency}/>
-            <button className="primary" type="submit" disabled={sf.columnRules.some(rule => !!ruleError(rule))}>Apply staff filters</button>
-            <p className="filter-state" role="status">{filtersPending ? "Changes ready to apply" : "Filters are up to date"}<span>Enter to apply</span></p>
-            <button type="button" className="text-button" onClick={() => {
-              const reset = { search: "", age: [18, 80] as [number, number], nations: [] as string[], attr: "Attacking", min: 1, sort: "CA", columnRules: [] as ColumnRule[] };
-              setSf(reset); setSfApplied(reset); setSort(null);
-            }}>Reset staff filters</button>
+            <div className="filter-actions">
+              <button className="primary" type="submit" disabled={sf.columnRules.some(rule => !!ruleError(rule))}>Apply staff filters</button>
+              <p className="filter-state" role="status">{filtersPending ? "Changes ready to apply" : "Filters are up to date"}<span>Enter to apply</span></p>
+              <button type="button" className="text-button" onClick={() => {
+                const reset = { search: "", age: [18, 80] as [number, number], nations: [] as string[], attr: "Attacking", min: 1, sort: "CA", columnRules: [] as ColumnRule[] };
+                setSf(reset); setSfApplied(reset); setSort(null);
+              }}>Reset staff filters</button>
+            </div>
           </form>
         )}
       </aside>

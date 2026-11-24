@@ -279,7 +279,8 @@ test('numeric filters allow clearing and replacing digits before restoring defau
  await age.fill('');
  await age.blur();
  await expect(age).toHaveValue('15');
- for(const section of ['Ability','Market']) await page.locator('summary').getByText(section,{exact:true}).click();
+ await expect(page.locator('summary').getByText('Ability',{exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('Current ability / 200 minimum',{exact:true})).toBeVisible();
  const playerInputs=page.locator('aside form input[type="number"]');
  const defaults=['15','40','1','200','1','200','0','100','0','100','0','0'];
  await expect(playerInputs).toHaveCount(defaults.length);
@@ -316,7 +317,7 @@ test('market minus sale column displays, sorts and exports the selected scenario
  await expect(heading).toBeVisible();
  const row=page.getByRole('row',{name:'Open Alex [Young]',exact:true});
  await expect(row.locator('.money-cell[aria-label="$400,000"]')).toBeVisible();
- await page.locator('summary').getByText('Market',{exact:true}).click();
+ await expect(page.locator('summary').getByText('Market',{exact:true}).locator('..')).toHaveAttribute('open','');
  await page.getByLabel('Buying-club eligibility').selectOption('Foreign clubs');
  await page.getByLabel('Sort results by').selectOption('ValueDifference');
  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
@@ -354,7 +355,7 @@ test('player listing badges sit before names and listing filters support both st
  await page.getByLabel('Appearance',{exact:true}).selectOption('dark');
  await expect(row(0).getByLabel('Transfer listed',{exact:true})).toBeVisible();
  await page.screenshot({path:'test-results/listing-badges-night.png',fullPage:true});
- await page.locator('summary').getByText('Market',{exact:true}).click();
+ await expect(page.locator('summary').getByText('Market',{exact:true}).locator('..')).toHaveAttribute('open','');
  const listing=page.getByLabel('Listing status',{exact:true});
  for(const [value,count] of [['Transfer',2],['Loan',2],['Either',3]] as const){
   await listing.selectOption(value);
@@ -379,7 +380,7 @@ test('column filters combine hidden attributes, currency, text and staff conditi
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  await page.getByLabel('Currency',{exact:true}).selectOption('USD');
  await page.keyboard.press('Escape');
- await page.locator('summary').getByText('Column filters',{exact:true}).click();
+ await expect(page.locator('summary').getByText('Column filters',{exact:true}).locator('..')).toHaveAttribute('open','');
  await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
  await page.getByLabel('Condition 1 column',{exact:true}).selectOption('Consis');
  await page.getByLabel('Condition 1 value',{exact:true}).fill('19');
@@ -400,7 +401,7 @@ test('column filters combine hidden attributes, currency, text and staff conditi
  const expected=data.players.filter((r:any)=>r.Club==='North FC').length;
  await expect(page.locator('.results-controls')).toContainText(expected+' players');
  await page.getByRole('button',{name:'Staff',exact:true}).click();
- await page.locator('summary').getByText('Column filters',{exact:true}).click();
+ await expect(page.locator('summary').getByText('Column filters',{exact:true}).locator('..')).toHaveAttribute('open','');
  await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
  await page.getByLabel('Condition 1 column',{exact:true}).selectOption('Physiotherapy');
  await page.getByLabel('Condition 1 value',{exact:true}).fill('21');
@@ -453,13 +454,13 @@ test('contract expiry has its own section above searchable column filters',async
  await expect(contract).toHaveCount(1);
  const columnFilters=page.locator('aside .column-filters');
  expect(await contract.evaluate((el)=>!!el.nextElementSibling?.classList.contains('column-filters'))).toBe(true);
- await contract.locator('summary').click();
+ await expect(contract).toHaveAttribute('open','');
  await page.getByLabel('Expires on or after',{exact:true}).fill('2027-06-01');
  await page.getByLabel('Expires on or before',{exact:true}).fill('2027-06-30');
  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
  await expect(page.locator('.results tbody tr[aria-label]')).toHaveCount(1);
  await expect(page.getByRole('row',{name:'Open '+data.players[0].Name,exact:true})).toBeVisible();
- await columnFilters.locator('summary').click();
+ await expect(columnFilters).toHaveAttribute('open','');
  await page.getByRole('button',{name:'+ Add condition',exact:true}).click();
  await page.getByLabel('Find column for condition 1',{exact:true}).fill('consistency');
  await expect(page.getByLabel('Condition 1 column',{exact:true}).locator('option')).toHaveCount(2);

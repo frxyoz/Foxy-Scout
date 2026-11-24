@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ColumnRule, SearchColumn, ruleError, isMoney } from "./data";
 
 const textOperators = [["contains", "contains"], ["not_contains", "does not contain"], ["eq", "equals"], ["ne", "does not equal"], ["starts", "starts with"], ["ends", "ends with"]];
@@ -33,14 +33,16 @@ function SearchableColumn({ columns, value, index, onChange }: {
 export function ColumnFilters({ columns, rules, onChange, currency }: {
   columns: SearchColumn[]; rules: ColumnRule[]; onChange: (rules: ColumnRule[]) => void; currency: string;
 }) {
+  const id = useId();
   const update = (index: number, patch: Partial<ColumnRule>) => onChange(rules.map((rule, i) => i === index ? { ...rule, ...patch } : rule));
-  return <details className="column-filters" open={rules.length > 0 || undefined}>
+  return <details className="column-filters" open>
     <summary>Column filters{rules.length > 0 ? ` (${rules.length})` : ""}</summary>
     <div className="details-content">
       <p className="filter-hint">Match every condition. Search any column, even when it’s hidden from the table.</p>
       {rules.map((rule, index) => {
         const column = columns.find(column => column.key === rule.column);
         const error = ruleError(rule);
+        const errorId = `${id}-condition-${index}-error`;
         const needsValue = !["empty", "present"].includes(rule.operator);
         return <fieldset className="column-rule" key={index}>
           <legend>Condition {index + 1}</legend>
@@ -54,14 +56,14 @@ export function ColumnFilters({ columns, rules, onChange, currency }: {
             </select>
           </label>
           {needsValue && <label>{isMoney(rule.column) ? `Value (${currency}, full amount)` : "Value"}
-            {rule.operator === "boolean" ? <select aria-label={`Condition ${index + 1} value`} value={rule.value} onChange={e => update(index, { value: e.target.value })}>
+            {rule.operator === "boolean" ? <select aria-label={`Condition ${index + 1} value`} value={rule.value} aria-invalid={!!error} aria-describedby={error ? errorId : undefined} onChange={e => update(index, { value: e.target.value })}>
               <option value="true">Yes</option><option value="false">No</option>
-            </select> : <input aria-label={`Condition ${index + 1} value`} aria-invalid={!!error}
+            </select> : <input aria-label={`Condition ${index + 1} value`} aria-invalid={!!error} aria-describedby={error ? errorId : undefined}
               type={["before", "after"].includes(rule.operator) ? "date" : column?.kind === "number" ? "number" : "text"} step="any"
               placeholder={column?.kind === "number" ? "Enter a number…" : "Enter text…"}
               value={rule.value} onChange={e => update(index, { value: e.target.value })} />}
           </label>}
-          {error && <p className="filter-error">{error}</p>}
+          {error && <p id={errorId} className="filter-error" role="alert">{error}</p>}
           <button type="button" className="text-button" aria-label={`Remove condition ${index + 1}`} onClick={() => onChange(rules.filter((_, i) => i !== index))}>Remove condition</button>
         </fieldset>;
       })}
