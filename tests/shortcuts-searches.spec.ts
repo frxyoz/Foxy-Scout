@@ -243,3 +243,19 @@ test('saved searches restore table layout and sort, and support update rename de
  await panel.getByRole('button',{name:'Delete search',exact:true}).click();
  await expect(panel.getByLabel('Saved searches',{exact:true}).getByRole('option',{name:'Midfield',exact:true})).toHaveCount(0);
 });
+
+test('choosing a saved search immediately restores its filters and results',async({page})=>{
+ await setup(page);
+ await expect(saved(page)).toHaveAttribute('open','');
+ await page.getByLabel('Search players',{exact:true}).fill('Alex');
+ const panel=await openSaved(page);
+ await panel.getByLabel('Search name',{exact:true}).fill('Young shortlist');
+ await panel.getByRole('button',{name:'Save search',exact:true}).click();
+ await page.getByRole('button',{name:'Reset filters',exact:true}).click();
+ await expect(rows(page)).toHaveCount(6);
+ await panel.getByLabel('Saved searches',{exact:true}).selectOption('');
+ await panel.getByLabel('Saved searches',{exact:true}).selectOption({label:'Young shortlist'});
+ await expect(page.getByLabel('Search players',{exact:true})).toHaveValue('Alex');
+ await expect(rows(page)).toHaveCount(1);
+ await expect(panel.getByRole('status')).toHaveText('Loaded “Young shortlist”.');
+});

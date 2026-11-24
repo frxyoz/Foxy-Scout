@@ -79,25 +79,28 @@ export function SavedSearches({ mode, configuration, disabled, onLoad }: SavedSe
   const [entries, setEntries] = useState(initial.entries);
   const [message, setMessage] = useState(initial.message);
   const [name, setName] = useState("");
+  const [nameError, setNameError] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const options = entries.filter(entry => entry.configuration.mode === mode);
   const selected = options.find(entry => entry.id === selectedId);
-  useEffect(() => { setName(""); setSelectedId(""); }, [mode]);
+  useEffect(() => { setName(""); setNameError(""); setSelectedId(""); }, [mode]);
 
   function persist(next: Entry[], notice: string): boolean {
     try {
       localStorage.setItem(storageKey, JSON.stringify(next));
-      setEntries(next); setMessage(notice); return true;
+      setEntries(next); setNameError(""); setMessage(notice); return true;
     } catch {
       setMessage("Could not save changes. Local storage may be full or unavailable."); return false;
     }
   }
   function validName(exceptId?: string): string | null {
     const trimmed = name.trim();
-    if (!trimmed || trimmed.length > 80) { setMessage("Enter a search name with 1–80 characters."); return null; }
+    if (!trimmed || trimmed.length > 80) { setMessage(""); setNameError("Enter a search name with 1–80 characters."); return null; }
     if (options.some(entry => entry.id !== exceptId && entry.name.toLowerCase() === trimmed.toLowerCase())) {
-      setMessage("That name is already saved. Choose another name or update the existing search."); return null;
+      setMessage("");
+      setNameError("That name is already saved. Choose another name or use Update search."); return null;
     }
+    setNameError("");
     return trimmed;
   }
   function currentConfiguration(): SearchConfiguration | null {
@@ -114,27 +117,36 @@ export function SavedSearches({ mode, configuration, disabled, onLoad }: SavedSe
     if (persist([...entries, entry], `Saved “${nextName}”.`)) { setSelectedId(entry.id); setName(nextName); }
   }
 
-  return <details className="saved-searches">
+  function load(entry: Entry) {
+    onLoad(structuredClone(entry.configuration));
+    setMessage(`Loaded “${entry.name}”.`);
+  }
+
+  return <details className="saved-searches" open>
     <summary>Saved searches{options.length > 0 ? ` (${options.length})` : ""}</summary>
     <div className="saved-searches-content">
-      <p className="filter-hint">Save filters, sorting, columns and currency for this view.</p>
-      <label htmlFor={`${id}-name`}>Search name</label>
-      <div className="saved-search-name">
-        <input id={`${id}-name`} type="text" maxLength={80} value={name} placeholder="e.g. Young prospects"
-          onChange={event => setName(event.target.value)} onKeyDown={event => {
-            if (event.key === "Enter") { event.preventDefault(); if (!disabled) save(); }
-          }} />
-        <button type="button" disabled={disabled || !name.trim()} onClick={save}>Save search</button>
-      </div>
+      <p className="filter-hint">{options.length ? "Choose to apply. Update replaces saved filters." : "Name your current filters to save a search."}</p>
       {options.length > 0 && <>
         <label htmlFor={`${id}-saved`}>Saved searches</label>
         <select id={`${id}-saved`} value={selected?.id || ""} onChange={event => {
           const entry = options.find(entry => entry.id === event.target.value);
-          setSelectedId(entry?.id || ""); setName(entry?.name || ""); setMessage("");
-        }}><option value="">Choose a search…</option>{options.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
+          setSelectedId(entry?.id || ""); setName(entry?.name || ""); setNameError("");
+          if (entry) load(entry); else setMessage("");
+        }}><option value="">Choose a search to apply…</option>{options.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
+      </>}
+      <label htmlFor={`${id}-name`}>Search name</label>
+      <div className="saved-search-name">
+        <input id={`${id}-name`} type="text" maxLength={80} value={name} aria-invalid={!!nameError} aria-describedby={nameError ? `${id}-name-error` : undefined} placeholder="e.g. Young prospects"
+          onChange={event => { setName(event.target.value); setNameError(""); }} onKeyDown={event => {
+            if (event.key === "Enter") { event.preventDefault(); if (!disabled) save(); }
+          }} />
+        <button type="button" disabled={disabled || !name.trim()} onClick={save}>Save search</button>
+      </div>
+      {nameError && <p id={`${id}-name-error`} className="filter-error" role="alert">{nameError}</p>}
+      {options.length > 0 && <>
         <div className="saved-search-actions">
           <button type="button" disabled={!selected} onClick={() => {
-            if (selected) { onLoad(structuredClone(selected.configuration)); setMessage(`Loaded “${selected.name}”.`); }
+            if (selected) load(selected);
           }}>Load search</button>
           <button type="button" disabled={!selected || disabled} title="Replace saved filters with the current view" onClick={() => {
             if (!selected) return;
@@ -147,12 +159,12 @@ export function SavedSearches({ mode, configuration, disabled, onLoad }: SavedSe
             if (nextName && persist(entries.map(entry => entry.id === selected.id ? { ...entry, name: nextName } : entry), `Renamed to “${nextName}”.`)) setName(nextName);
           }}>Rename search</button>
           <button type="button" disabled={!selected} onClick={() => {
-            if (selected && persist(entries.filter(entry => entry.id !== selected.id), `Deleted “${selected.name}”.`)) { setSelectedId(""); setName(""); }
+            if (selected && persist(entries.filter(entry => entry.id !== selected.id), `Deleted “${selected.name}”.`)) { setSelectedId(""); setName(""); setNameError(""); }
           }}>Delete search</button>
         </div>
       </>}
       {disabled && <p className="filter-hint">Complete the current filters to save or update a search.</p>}
-      <p className="saved-search-status" role="status">{message}</p>
+      <p className="saved-search-status" role="status" aria-live="polite" aria-atomic="true">{message}</p>
     </div>
   </details>;
 }
