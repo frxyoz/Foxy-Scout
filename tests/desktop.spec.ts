@@ -1,22 +1,23 @@
 import {test,expect,Page} from '@playwright/test';
 import {readFileSync} from 'node:fs';
+import {createServer} from 'node:http';
 const fixture=JSON.parse(readFileSync('tests/fixtures/ui.json','utf8'));
-async function setup(page:Page,data=fixture){
- await page.route('**/__scout_fixture',route=>route.fulfill({json:data}));
- await page.addInitScript(()=>{
+async function setup(page:Page,data=fixture,fixtureUrl='/__scout_fixture'){
+ if(fixtureUrl==='/__scout_fixture')await page.route('**/__scout_fixture',route=>route.fulfill({json:data}));
+ await page.addInitScript((fixtureUrl)=>{
   (window as any).__exports=[];
   (window as any).__TAURI_INTERNALS__={invoke:async(command:string,args:any)=>{
    if(command==='recent_saves')return ['/fixtures/example.fm'];
    if(command==='choose_save')return '/fixtures/example.fm';
    if(command==='list_saves')return ['/fixtures/example.fm'];
-   if(command==='load_save')return fetch('/__scout_fixture').then(r=>r.json());
+   if(command==='load_save')return fetch(fixtureUrl).then(r=>r.json());
    if(command==='export_csv'){(window as any).__exports.push(args);return '/fixtures/export.csv';}
    if(command==='quit_app')return;
    if(command==='load_preferences')return null;
    if(command==='role_report')return {current:[],potential:[]};
    throw new Error('Unexpected command '+command);
   }};
- });
+ },fixtureUrl);
  await page.goto('/');
  await page.getByRole('button',{name:'Load FM24 save',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Player scouting',exact:true})).toBeVisible();
@@ -158,16 +159,32 @@ test('large real-save result sets render through the desktop IPC contract',async
  test.skip(!process.env.FSS_UI_BASELINE,'Set FSS_UI_BASELINE to a local captured baseline');
  const baseline=JSON.parse(readFileSync(process.env.FSS_UI_BASELINE!,'utf8'));
  const data={players:baseline.table,staff:baseline.staff,game_date:baseline.game_date,game_year:baseline.game_year,fm_version:24,elapsed_ms:1000,cache_hit:false};
- await setup(page,data);
- const shown=baseline.table.filter((r:any)=>r.Age>=15&&r.Age<=40&&r.CA>=1&&r.PA>=1&&r.PA<=200);
- await expect(page.locator('.results-controls')).toContainText(shown.length.toLocaleString('en-US')+' players');
- expect(await page.locator('.results tbody tr').count()).toBeLessThan(60);
- await page.getByLabel('Search players',{exact:true}).fill('2002066982');
- await page.getByRole('button',{name:'Apply filters',exact:true}).click();
- await expect(page.getByRole('row',{name:'Open Tejay McGrann',exact:true})).toBeVisible();
- await page.getByRole('row',{name:'Open Tejay McGrann',exact:true}).click();
- await expect(page.locator('.metrics')).toContainText('160 / 200');
- await page.screenshot({path:'.cache/migration/desktop-real-report.png',fullPage:true});
+ // Large captures exceed reliable CDP route.fulfill payload sizes. Serve the
+ // unchanged snapshot over loopback HTTP, as a normal browser fetch response.
+ const body=JSON.stringify(data);
+ const server=createServer((_request,response)=>{
+  response.setHeader('Access-Control-Allow-Origin','http://127.0.0.1:1420');
+  response.setHeader('Content-Type','application/json');
+  response.end(body);
+ });
+ await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const address=server.address();
+ if(!address||typeof address==='string')throw new Error('Fixture server did not bind');
+ try {
+  await setup(page,data,`http://127.0.0.1:${address.port}/fixture`);
+  const shown=baseline.table.filter((r:any)=>r.Age>=15&&r.Age<=40&&r.CA>=1&&r.PA>=1&&r.PA<=200);
+  await expect(page.locator('.results-controls')).toContainText(shown.length.toLocaleString('en-US')+' players');
+  expect(await page.locator('.results tbody tr').count()).toBeLessThan(60);
+  await page.getByLabel('Search players',{exact:true}).fill('2002066982');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await expect(page.getByRole('row',{name:'Open Tejay McGrann',exact:true})).toBeVisible();
+  await page.getByRole('row',{name:'Open Tejay McGrann',exact:true}).click();
+  await expect(page.locator('.metrics')).toContainText('160 / 200');
+  await page.screenshot({path:'.cache/migration/desktop-real-report.png',fullPage:true});
+ } finally {
+  server.closeAllConnections();
+  await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
+ }
 });
 
 test('money cells abbreviate only at narrow widths and retain full accessible values',async({page})=>{
