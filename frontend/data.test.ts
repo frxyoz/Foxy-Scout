@@ -84,6 +84,14 @@ describe("filter parity", () => {
       filterPlayers(rows, { ...defaults, positions: ["ST"] }, "2031-08-17", 1),
     ).toHaveLength(1);
   });
+  it("filters current club by a trimmed case-insensitive substring", () => {
+    expect(
+      filterPlayers(rows, { ...defaults, club: "  arse  " }, "2031-08-17", 1).map((r) => r.Name),
+    ).toEqual(["Tejay McGrann"]);
+    expect(
+      filterPlayers(rows, { ...defaults, club: "north" }, "2031-08-17", 1),
+    ).toHaveLength(0);
+  });
   it("changes clause scenario before applying currency budget", () => {
     const result = filterPlayers(
       rows,

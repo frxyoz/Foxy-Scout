@@ -327,11 +327,11 @@ export function filterPlayers(
         !between(r.PotRtg ?? 0, f.potential)
       )
         return false;
-      if (
-        f.club &&
-        !String(r.Club).toLowerCase().includes(f.club.toLowerCase())
-      )
-        return false;
+      const clubQuery = f.club.trim().toLowerCase();
+      if (clubQuery) {
+        if (typeof r.Club !== "string" || !r.Club.toLowerCase().includes(clubQuery))
+          return false;
+      }
       if (f.nations.length && !f.nations.includes(r.Nation)) return false;
       if (f.positions.length && !f.positions.some((p) => r["Pos_" + p] >= 10))
         return false;
