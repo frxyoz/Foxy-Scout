@@ -15,10 +15,19 @@ Foxy Scout reads an FM24 save on your computer and turns it into a searchable pl
 - Filter players by age, ability, position, role rating, nationality, club, contract and estimated price.
 - Inspect player reports with attributes, positional familiarity, role ratings, contract details and value estimates.
 - Compare up to six players across player attributes and contract information.
-- Search staff and review coaching, scouting, medical and mental attributes.
+- Search staff and review coaching, scouting, medical and mental attributes. Compare up to six staff members side by side.
+- Keep named player shortlists, notes and tags in local scouting notebooks. View and remove applied filters above the results.
 - Display and export values in euros or US dollars. Edit the USD-per-euro rate in Settings.
 - Customize CSV exports: all filtered rows or a row range, current table or all columns, comma/semicolon/tab separators, and optional headers. Review row and column counts before saving.
 - Keep save files local. The reader does not modify saves.
+
+## Scouting notebooks
+
+Open **Shortlists & notes** above the player results and create a notebook for your career. Create a named shortlist, then open a player report to add that player, write notes or save comma-separated tags. The shortlist view and tag selector work together with the applied scouting filters; CSV export uses those visible, sorted results.
+
+Notebooks are stored locally in the app. Save paths start separately: under **Manage notebooks**, select an existing notebook when loading another save from the same career. Start a new notebook for a different career, even if you reuse a save filename. Missing players remain on shortlists when a later save no longer contains them. Deleting a shortlist keeps player notes.
+
+In either workspace, enable **Compare**, select two to six rows and choose **Compare selected**. Player and staff selections are independent. Applied-filter buttons remove individual conditions immediately; unapplied changes are still marked separately.
 
 ## Currency
 

@@ -12,8 +12,8 @@ export const shortcutGroups = [
     ["↓ from search", "Move to results"], ["↑ / ↓ or K / J", "Move between rows"],
     ["Home / End", "First / last result"], ["Page Up / Down", "Move a page of results"],
     ["Space", "Open a row or select for comparison"], ["Esc", "Return from a report or close a panel"],
-    ["Alt + ← / →", "Previous / next report"], ["Alt + C", "Toggle player comparison"],
-    ["Alt + Return", "Compare selected players"],
+    ["Alt + ← / →", "Previous / next report"], ["Alt + C", "Toggle comparison"],
+    ["Alt + Return", "Compare selected people"],
   ] },
   { title: "Column sorting", entries: [
     ["Alt + 1–9", "Sort by the numbered visible column; repeat to reverse"],

@@ -9,6 +9,7 @@ import {
   labels,
   positions,
   scenarios,
+  scenarioRows,
   overview,
   extras,
   isMoney,
@@ -27,6 +28,8 @@ import { ColumnPicker } from "./ColumnPicker";
 import { AppHeader } from "./AppHeader";
 import { Preferences, Appearance, Accent, Motion, Density } from "./Preferences";
 import { SavedSearches, SearchConfiguration } from "./SavedSearches";
+import { ActiveFilters } from "./ActiveFilters";
+import { NotebookPanel, PlayerNotebook, useScoutingNotebook } from "./ScoutingNotebook";
 import { KeybindBar, ShortcutGuide } from "./KeyboardShortcuts";
 import { ExportDialog } from "./ExportDialog";
 import logo from "./assets/fox-logo.png";
@@ -376,7 +379,7 @@ function DataTable({
         </colgroup>
         <thead>
           <tr>
-            {compareMode && <th aria-label="Select players" />}
+            {compareMode && <th aria-label={staff ? "Select staff" : "Select players"} />}
             {columns.map((k, columnIndex) => (
               <th key={k} aria-sort={sort?.key === k ? (sort.asc ? "ascending" : "descending") : "none"}>
                 <button
@@ -654,11 +657,13 @@ function Report({
   staff,
   factor,
   symbol,
+  scoutingRecord,
 }: {
   row: Row;
   staff: boolean;
   factor: number;
   symbol: string;
+  scoutingRecord?: React.ReactNode;
 }) {
   const [sg, setSg] = useSaved("foxy-staff-report-group", "Coaching");
   const money = (v: any) =>
@@ -726,6 +731,7 @@ function Report({
           ))}
         </div>
       </div>
+      {scoutingRecord}
       {staff ? (
         <>
           <Tabs
@@ -892,13 +898,17 @@ function Comparison({
   rows,
   factor,
   symbol,
+  staff = false,
 }: {
+  staff?: boolean;
   rows: Row[];
   factor: number;
   symbol: string;
 }) {
-  const [group, setGroup] = useSaved("foxy-compare-group", "Overview");
-  const keys =
+  const [savedGroup, setGroup] = useSaved(staff ? "foxy-staff-compare-group" : "foxy-compare-group", "Overview");
+  const options = staff ? ["Overview", ...Object.keys(staffGroups)] : ["Overview", ...Object.keys(groups), "Contract & bio"];
+  const group = options.includes(savedGroup) ? savedGroup : "Overview";
+  const keys = staff ? (group === "Overview" ? ["Nation", "Age", "CA", "PA", "Reputation", "Attacking", "Defending", "Judging Player Ability", "Judging Player Potential", "Physiotherapy"] : staffGroups[group]) :
     group === "Overview"
       ? [
           "BestPos",
@@ -928,19 +938,10 @@ function Comparison({
         : groups[group] || [];
   return (
     <section>
-      <h2>Compare players</h2>
+      <h2>Compare {staff ? "staff" : "players"}</h2>
       <Tabs
         label="Compare category"
-        options={[
-          "Overview",
-          "Technical",
-          "Mental",
-          "Physical",
-          "Hidden",
-          "Personality",
-          "Goalkeeping",
-          "Contract & bio",
-        ]}
+        options={options}
         value={group}
         onChange={setGroup}
       />
@@ -1041,9 +1042,10 @@ function App() {
     [draft, setDraft] = useState<Filters>(defaults),
     [filters, setFilters] = useState<Filters>(defaults),
     [sort, setSort] = useState<{ key: string; asc: boolean } | null>(null),
-    [cmp, setCmp] = useState(false),
+    [comparisons, setComparisons] = useState<Record<string, { enabled: boolean; ids: number[] }>>({ Players: { enabled: false, ids: [] }, Staff: { enabled: false, ids: [] } }),
     [exportOpen, setExportOpen] = useState(false),
-    [selected, setSelected] = useState<number[]>([]),
+    [activeList, setActiveList] = useState(""),
+    [playerTag, setPlayerTag] = useState(""),
     [columns, setColumns] = useSaved<string[]>("foxy-columns-v3", (() => {
       const previous = saved<string[]>("foxy-columns-v2", saved<string[]>("foxy-columns", overview));
       const next = (previous.includes("ValueDifference") ? [...previous] : [...previous, "ValueDifference"]).filter(key => key !== "Nation");
@@ -1069,8 +1071,13 @@ function App() {
       columnRules: [] as ColumnRule[],
     }),
     [sfApplied, setSfApplied] = useState(sf);
-  const view = views[mode],
-    profile = profiles[mode];
+  const view = views[mode], profile = profiles[mode];
+  const cmp = comparisons[mode].enabled, selected = comparisons[mode].ids;
+  const setCmp = (value: React.SetStateAction<boolean>) => setComparisons(all => ({ ...all, [mode]: { ...all[mode], enabled: typeof value === "function" ? value(all[mode].enabled) : value } }));
+  const setSelected = (value: React.SetStateAction<number[]>) => setComparisons(all => ({ ...all, [mode]: { ...all[mode], ids: typeof value === "function" ? value(all[mode].ids) : value } }));
+  const notebook = useScoutingNotebook(loadedPath);
+  useEffect(() => { setActiveList(""); setPlayerTag(""); }, [loadedPath, notebook.book?.id]);
+  const shortlist = notebook.book?.lists.find(list => list.id === activeList);
   const filtersPending = JSON.stringify(mode === "Staff" ? sf : draft) !== JSON.stringify(mode === "Staff" ? sfApplied : filters);
   const setView = (value: string) => setViews((v) => ({ ...v, [mode]: value }));
   const setProfile = (value: Row | null) =>
@@ -1160,7 +1167,19 @@ function App() {
         ),
     [staff, sfApplied, factor],
   );
-  const baseRows = mode === "Staff" ? filteredStaff : filtered;
+  const taggedPlayers = useMemo(() => playerTag ? filtered.filter(row => notebook.book?.notes[String(row.UID)]?.tags.includes(playerTag)) : filtered, [filtered, playerTag, notebook.book]);
+  const shortlistPlayers = useMemo(() => {
+    if (!shortlist) return taggedPlayers;
+    const ids = new Set(shortlist.players);
+    return taggedPlayers.filter(row => ids.has(row.UID));
+  }, [taggedPlayers, shortlist]);
+  const baseRows = mode === "Staff" ? filteredStaff : shortlistPlayers;
+  const comparisonRows = useMemo(() => {
+    const ids = new Set(selected);
+    const chosen = (mode === "Staff" ? staff : players).filter(row => ids.has(row.UID));
+    const source = new Map((mode === "Staff" ? chosen : scenarioRows(chosen, filters.scenario)).map(row => [row.UID, row]));
+    return selected.map(id => source.get(id)).filter((row): row is Row => !!row);
+  }, [mode, staff, players, selected, filters.scenario]);
   const rows = useMemo(
     () =>
       sort
@@ -1233,6 +1252,7 @@ function App() {
     setCurrency(config.currency); setRate(config.rate); setSort(config.sort);
     if (config.mode === "Players") {
       setDraft(config.filters); setFilters(config.filters); setColumns(config.columns);
+      setActiveList(""); setPlayerTag("");
       setGroup(["Overview", "All attributes", ...Object.keys(groups)].includes(config.group) ? config.group : "Overview");
       setSelected([]);
     } else {
@@ -1283,8 +1303,8 @@ function App() {
         }
         else if (event.code === "KeyP" || event.code === "KeyS") { event.preventDefault(); const next = event.code === "KeyP" ? "Players" : "Staff"; setMode(next); setViews(value => ({ ...value, [next]: "list" })); setSort(null); }
         else if (event.code === "KeyE" && view === "list" && snapshot && rows.length) { event.preventDefault(); setExportOpen(true); }
-        else if (event.code === "KeyC" && mode === "Players" && view === "list") { event.preventDefault(); setCmp(value => !value); setSelected([]); }
-        else if (event.key === "Enter" && mode === "Players" && cmp && selected.length >= 2) { event.preventDefault(); setView("compare"); }
+        else if (event.code === "KeyC" && view === "list") { event.preventDefault(); setCmp(value => !value); setSelected([]); }
+        else if (event.key === "Enter" && cmp && selected.length >= 2) { event.preventDefault(); setView("compare"); }
         else if (event.key === "ArrowLeft" || event.key === "ArrowRight") { if (view === "profile") { event.preventDefault(); browseProfile(event.key === "ArrowLeft" ? -1 : 1); } }
         return;
       }
@@ -1307,7 +1327,8 @@ function App() {
       setLoadedPath(path);
       setViews({ Players: "list", Staff: "list" });
       setProfiles({ Players: null, Staff: null });
-      setSelected([]);
+      setComparisons({ Players: { enabled: false, ids: [] }, Staff: { enabled: false, ids: [] } });
+      setActiveList(""); setPlayerTag("");
       setNotice(
         `${result.cache_hit ? "Loaded from disk cache" : "Save loaded"} · ${(result.elapsed_ms / 1000).toFixed(2)}s`,
       );
@@ -1327,7 +1348,7 @@ function App() {
     }
   }
   function select(r: Row) {
-    if (mode === "Staff" || !cmp) {
+    if (!cmp) {
       setProfile(r);
       setView("profile");
       return;
@@ -1609,6 +1630,7 @@ function App() {
                 onClick={() => {
                   setDraft(defaults);
                   setFilters(defaults);
+                  setActiveList(""); setPlayerTag("");
                   setSort(null);
                 }}
               >
@@ -1824,6 +1846,7 @@ function App() {
             </button>
             <Report
               row={profile}
+              scoutingRecord={mode === "Players" ? <PlayerNotebook key={`${notebook.book?.id || "none"}:${profile.UID}`} row={profile} model={notebook} /> : undefined}
               staff={mode === "Staff"}
               factor={factor}
               symbol={symbol}
@@ -1832,10 +1855,11 @@ function App() {
         ) : view === "compare" ? (
           <>
             <button className="back" onClick={() => setView("list")}>
-              ← Back to Player List
+              ← Back to {mode === "Staff" ? "Staff" : "Player"} List
             </button>
-            <Comparison
-              rows={filtered.filter((r) => selected.includes(r.UID))}
+            <Comparison key={mode}
+              staff={mode === "Staff"}
+              rows={comparisonRows}
               factor={factor}
               symbol={symbol}
             />
@@ -1853,6 +1877,14 @@ function App() {
               </span>
             </div>
             <p className="muted file-name">{loadedPath.split("/").at(-1)}</p>
+            {mode === "Players" && <NotebookPanel model={notebook} path={loadedPath} players={players} activeList={activeList} onListChange={setActiveList} tag={playerTag} onTagChange={setPlayerTag} matching={taggedPlayers} />}
+            <ActiveFilters mode={mode} players={filters} staff={sfApplied} currency={currency}
+              onPlayerChange={change => { setFilters(change); setDraft(change); }} onStaffChange={change => { setSfApplied(change); setSf(change); }}
+              extra={mode === "Players" ? [
+                ...(shortlist ? [{id:"shortlist",label:`Shortlist: ${shortlist.name}`,remove:()=>setActiveList("")}] : []),
+                ...(playerTag ? [{id:"tag",label:`Tag: ${playerTag}`,remove:()=>setPlayerTag("")}] : []),
+              ] : []}
+              onClear={() => { if (mode === "Players") { const reset = {...defaults, sort: filters.sort}; setFilters(reset); setDraft(reset); setActiveList(""); setPlayerTag(""); } else { const reset = {search:"",age:[18,80] as [number,number],nations:[],attr:"Attacking",min:1,sort:sfApplied.sort,columnRules:[]};setSf(reset);setSfApplied(reset); } }} />
             {mode === "Staff" && (
               <div className="staff-summary">
                 <span>
@@ -1886,21 +1918,18 @@ function App() {
                       {["Overview", "Hidden", "Personality", "Technical", "Mental", "Physical", "Goalkeeping", "All attributes"].map((g) => <option key={g}>{g}</option>)}
                     </select>
                   </Field>
-                  <label className="check">
-                    <input type="checkbox" checked={cmp} onChange={(e) => { setCmp(e.target.checked); setSelected([]); }} />
-                    Compare
-                  </label>
                 </>
               ) : (
                 <Tabs label="Staff table" options={["Overview", ...Object.keys(staffGroups)]} value={staffGroup} onChange={setStaffGroup} />
               )}
+              <label className="check"><input type="checkbox" checked={cmp} onChange={e => { setCmp(e.target.checked); setSelected([]); }} />Compare</label>
               <button onClick={() => setExportOpen(true)} disabled={!rows.length}>
                 Export CSV
               </button>
             </div>
-            {cmp && mode === "Players" && (
+            {cmp && (
               <div className="compare-controls">
-                <span>{selected.length} of 6 players selected</span>
+                <span>{selected.length} of 6 {mode.toLowerCase()} selected</span>
                 <button
                   disabled={selected.length < 2}
                   onClick={() => setView("compare")}
@@ -1930,7 +1959,7 @@ function App() {
                   columns={shown}
                   onSelect={select}
                   selected={selected}
-                  compareMode={mode === "Players" && cmp}
+                  compareMode={cmp}
                   factor={factor}
                   symbol={symbol}
                   sort={sort}
